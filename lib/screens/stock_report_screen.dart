@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:pos_system/models/stock_report.dart';
-import 'package:pos_system/services/stock_report_service.dart';
+import 'package:zite_web_pos/models/stock_report.dart';
+import 'package:zite_web_pos/services/stock_report_service.dart';
 import 'package:intl/intl.dart';
-import 'package:pos_system/services/export_service.dart';
-
+import 'package:zite_web_pos/services/export_service.dart';
 
 class StockReportScreen extends StatefulWidget {
   const StockReportScreen({super.key});
@@ -84,56 +83,51 @@ class _StockReportScreenState extends State<StockReportScreen> {
   }
 
   Future<void> _exportToExcel() async {
-    if (_filteredReports.isEmpty) {
-      _showSnackBar('No data to export', Colors.orange);
-      return;
-    }
+    if (_reports.isEmpty || _summary == null) return;
     setState(() => _isExporting = true);
     try {
-      final file = await _exportService.exportStockToExcelWithPicker(
-        _filteredReports,
-        _summary!,
-      );
-      if (file != null) {
-        _showSnackBar('File saved: ${file.path.split('/').last}', Colors.green);
-      } else {
-        _showSnackBar('Save cancelled', Colors.orange);
+      await _exportService.exportStockToExcelWeb(_reports, _summary!);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Excel file downloaded'),
+            backgroundColor: Colors.green,
+          ),
+        );
       }
     } catch (e) {
-      _showSnackBar('Error: $e', Colors.red);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+        );
+      }
     } finally {
       if (mounted) setState(() => _isExporting = false);
     }
   }
 
   Future<void> _exportToPdf() async {
-    if (_filteredReports.isEmpty) {
-      _showSnackBar('No data to export', Colors.orange);
-      return;
-    }
+    if (_reports.isEmpty || _summary == null) return;
     setState(() => _isExporting = true);
     try {
-      final file = await _exportService.exportStockToPdfWithPicker(
-        _filteredReports,
-        _summary!,
-      );
-      if (file != null) {
-        _showSnackBar('File saved: ${file.path.split('/').last}', Colors.green);
-      } else {
-        _showSnackBar('Save cancelled', Colors.orange);
+      await _exportService.exportStockToPdfWeb(_reports, _summary!);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('PDF file downloaded'),
+            backgroundColor: Colors.green,
+          ),
+        );
       }
     } catch (e) {
-      _showSnackBar('Error: $e', Colors.red);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+        );
+      }
     } finally {
       if (mounted) setState(() => _isExporting = false);
     }
-  }
-
-  void _showSnackBar(String message, Color color) {
-    if (!mounted) return;
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(message), backgroundColor: color));
   }
 
   @override
@@ -309,9 +303,9 @@ class _StockReportScreenState extends State<StockReportScreen> {
       child: Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: color.withOpacity(0.1),
+          color: color.withValues(alpha: 0.1),
           borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: color.withOpacity(0.3)),
+          border: Border.all(color: color.withValues(alpha: 0.3)),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -354,9 +348,9 @@ class _StockReportScreenState extends State<StockReportScreen> {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: color.withOpacity(0.3)),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -399,7 +393,7 @@ class _StockReportScreenState extends State<StockReportScreen> {
     IconData statusIcon = isOutOfStock
         ? Icons.error
         : (isLowStock ? Icons.warning : Icons.check_circle);
-    Color iconBgColor = statusColor.withOpacity(0.1);
+    Color iconBgColor = statusColor.withValues(alpha: 0.1);
 
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
@@ -473,7 +467,7 @@ class _StockReportScreenState extends State<StockReportScreen> {
               Container(
                 margin: const EdgeInsets.only(top: 8),
                 padding: const EdgeInsets.all(8),
-                color: Colors.orange.withOpacity(0.1),
+                color: Colors.orange.withValues(alpha: 0.1),
                 child: const Text(
                   '⚠️ Low Stock Alert - Consider reordering',
                   style: TextStyle(fontSize: 12, color: Colors.orange),
@@ -483,7 +477,7 @@ class _StockReportScreenState extends State<StockReportScreen> {
               Container(
                 margin: const EdgeInsets.only(top: 8),
                 padding: const EdgeInsets.all(8),
-                color: Colors.red.withOpacity(0.1),
+                color: Colors.red.withValues(alpha: 0.1),
                 child: const Text(
                   '❌ Out of Stock - Immediate reorder required',
                   style: TextStyle(fontSize: 12, color: Colors.red),

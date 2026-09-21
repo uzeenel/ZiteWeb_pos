@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:pos_system/services/sale_service.dart';
+import 'package:zite_web_pos/services/sale_service.dart';
 import 'package:intl/intl.dart';
 
 class SalesHistoryScreen extends StatefulWidget {
@@ -271,7 +271,7 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
                             style: const TextStyle(fontWeight: FontWeight.bold),
                           ),
                           subtitle: Text(
-                            '$formattedDate\n${itemCount} items',
+                            '$formattedDate\n$itemCount items',
                             style: const TextStyle(fontSize: 12),
                           ),
                           trailing: Column(
@@ -286,6 +286,15 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
                                   color: Colors.green,
                                 ),
                               ),
+                              if (_toDouble(sale['discount_amount']) > 0)
+                                Text(
+                                  '-₦${_toDouble(sale['discount_amount']).toStringAsFixed(0)} disc.',
+                                  style: const TextStyle(
+                                    fontSize: 10,
+                                    color: Colors.red,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
                               Text(
                                 sale['payment_method'] ?? 'Cash',
                                 style: const TextStyle(
@@ -438,19 +447,39 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
                       ],
                     ),
                     const SizedBox(height: 4),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text(
-                          'VAT (7.5%):',
-                          style: TextStyle(fontSize: 13),
-                        ),
-                        Text(
-                          '₦${_toDouble(saleData['tax']).toStringAsFixed(0)}',
-                          style: const TextStyle(fontSize: 13),
-                        ),
-                      ],
-                    ),
+                                        if (_toDouble(saleData['discount_amount']) > 0) ...[
+                      const SizedBox(height: 4),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text(
+                            'Discount:',
+                            style: TextStyle(fontSize: 13, color: Colors.red),
+                          ),
+                          Text(
+                            '-₦${_toDouble(saleData['discount_amount']).toStringAsFixed(0)}',
+                            style: const TextStyle(
+                              fontSize: 13,
+                              color: Colors.red,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                    if (_toDouble(saleData['tax']) > 0) ...[
+                      const SizedBox(height: 4),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text('VAT:', style: TextStyle(fontSize: 13)),
+                          Text(
+                            '₦${_toDouble(saleData['tax']).toStringAsFixed(0)}',
+                            style: const TextStyle(fontSize: 13),
+                          ),
+                        ],
+                      ),
+                    ],
                     const SizedBox(height: 8),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,

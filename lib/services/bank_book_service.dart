@@ -1,17 +1,34 @@
-import 'package:pos_system/models/bank_book.dart';
-import 'package:pos_system/services/api_service.dart';
+import 'package:zite_web_pos/models/bank_book.dart';
+import 'package:zite_web_pos/services/api_service.dart';
 
 class BankBookService {
   // Get transactions by date range
-  Future<List<BankTransaction>> getTransactionsByDateRange(
+ Future<List<BankTransaction>> getTransactionsByDateRange(
     DateTime start,
     DateTime end,
   ) async {
     try {
       final response = await ApiService.getBankTransactions(start, end);
-      return response
-          .map((json) => BankTransaction.fromMap(_convertNumbers(json)))
-          .toList();
+      print('API Response length: ${response.length}');
+
+      return response.map((json) {
+        // Create a safe copy with defaults for null values
+        final safeJson = Map<String, dynamic>.from(json);
+
+        // Ensure string fields are never null
+        safeJson['account_name'] = safeJson['account_name'] ?? '';
+        safeJson['bank_name'] = safeJson['bank_name'] ?? '';
+        safeJson['description'] = safeJson['description'] ?? '';
+        safeJson['reference'] = safeJson['reference'] ?? '';
+        safeJson['cheque_number'] = safeJson['cheque_number'];
+
+        // Ensure amount is a number
+        if (safeJson['amount'] is String) {
+          safeJson['amount'] = double.tryParse(safeJson['amount']) ?? 0.0;
+        }
+
+        return BankTransaction.fromMap(safeJson);
+      }).toList();
     } catch (e) {
       print('Error fetching bank transactions: $e');
       return [];

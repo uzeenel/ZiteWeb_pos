@@ -1,6 +1,6 @@
-import 'package:pos_system/models/customer.dart';
-import 'package:pos_system/models/region.dart';
-import 'package:pos_system/services/api_service.dart';
+import 'package:zite_web_pos/models/customer.dart';
+import 'package:zite_web_pos/models/region.dart';
+import 'package:zite_web_pos/services/api_service.dart';
 
 class CustomerService {
   // Get all customers

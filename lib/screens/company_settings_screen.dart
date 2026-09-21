@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:pos_system/models/company.dart';
-import 'package:pos_system/models/region.dart';
-import 'package:pos_system/services/company_service.dart';
-import 'package:pos_system/screens/unauthorized_screen.dart';
-import 'package:pos_system/utils/permissions.dart';
+import 'package:zite_web_pos/models/company.dart';
+import 'package:zite_web_pos/models/region.dart';
+import 'package:zite_web_pos/services/company_service.dart';
+import 'package:zite_web_pos/screens/unauthorized_screen.dart';
+import 'package:zite_web_pos/utils/permissions.dart';
+import 'dart:io';
+import 'package:image_picker/image_picker.dart';
 
 class CompanySettingsScreen extends StatefulWidget {
   const CompanySettingsScreen({super.key});
@@ -25,14 +27,22 @@ class _CompanySettingsScreenState extends State<CompanySettingsScreen> {
   final _phoneController = TextEditingController();
   final _emailController = TextEditingController();
   final _taxIdController = TextEditingController();
+  final _defaultMarkupController = TextEditingController();
+  final _vatRateController = TextEditingController();
 
   // Settings
   bool _autoCashBook = true;
   bool _autoBankBook = true;
+  bool _vatEnabled = true;
 
   // Region selection
   List<Region> _regions = [];
   Region? _selectedRegion;
+
+  // Logo
+  String? _logoPath;
+  File? _logoFile;
+  final ImagePicker _imagePicker = ImagePicker();
 
   @override
   void initState() {
@@ -43,11 +53,12 @@ class _CompanySettingsScreenState extends State<CompanySettingsScreen> {
   Future<void> _loadData() async {
     setState(() => _isLoading = true);
 
-    // Load company data
     final company = await _companyService.getCompany();
-
-    // Load regions/states
     final regions = await _companyService.getAllStates();
+
+    print('=== COMPANY DATA ===');
+    print('Company: $company');
+    print('Logo path: ${company?.logoPath}');
 
     setState(() {
       _regions = regions;
@@ -60,6 +71,10 @@ class _CompanySettingsScreenState extends State<CompanySettingsScreen> {
         _taxIdController.text = company.taxId ?? '';
         _autoCashBook = company.autoCashBook;
         _autoBankBook = company.autoBankBook;
+        _defaultMarkupController.text = company.defaultMarkupPercent.toString();
+        _vatEnabled = company.vatEnabled;
+        _vatRateController.text = company.vatRate.toString();
+        _logoPath = company.logoPath; // Make sure this is being set
 
         if (company.stateId != null) {
           _selectedRegion = regions.firstWhere(
@@ -70,6 +85,38 @@ class _CompanySettingsScreenState extends State<CompanySettingsScreen> {
       }
 
       _isLoading = false;
+    });
+  }
+
+  Future<void> _pickLogo() async {
+    try {
+      final XFile? image = await _imagePicker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 500,
+        maxHeight: 500,
+        imageQuality: 80,
+      );
+
+      if (image != null) {
+        setState(() {
+          _logoFile = File(image.path);
+          _logoPath = image.path;
+        });
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error picking image: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  Future<void> _removeLogo() async {
+    setState(() {
+      _logoFile = null;
+      _logoPath = null;
     });
   }
 
@@ -90,6 +137,11 @@ class _CompanySettingsScreenState extends State<CompanySettingsScreen> {
         stateId: _selectedRegion?.id,
         autoCashBook: _autoCashBook,
         autoBankBook: _autoBankBook,
+        defaultMarkupPercent:
+            double.tryParse(_defaultMarkupController.text) ?? 0,
+        vatEnabled: _vatEnabled,
+        vatRate: double.tryParse(_vatRateController.text) ?? 0,
+        logoFile: _logoFile,
       );
 
       ScaffoldMessenger.of(context).showSnackBar(
@@ -157,6 +209,89 @@ class _CompanySettingsScreenState extends State<CompanySettingsScreen> {
                               ),
                             ),
                             const SizedBox(height: 16),
+                            // Logo Section
+                            Center(
+                              child: Column(
+                                children: [
+                                  Container(
+                                    width: 120,
+                                    height: 120,
+                                    decoration: BoxDecoration(
+                                      color: Colors.grey.shade100,
+                                      borderRadius: BorderRadius.circular(12),
+                                      border: Border.all(
+                                        color: Colors.grey.shade300,
+                                      ),
+                                    ),
+                                    child: _logoFile != null
+                                        ? ClipRRect(
+                                            borderRadius: BorderRadius.circular(
+                                              12,
+                                            ),
+                                            child: Image.file(
+                                              _logoFile!,
+                                              width: 120,
+                                              height: 120,
+                                              fit: BoxFit.cover,
+                                            ),
+                                          )
+                                        : _logoPath != null
+                                        ? ClipRRect(
+                                            borderRadius: BorderRadius.circular(
+                                              12,
+                                            ),
+                                            child: Image.network(
+                                              'http://localhost:3000$_logoPath',
+                                              width: 120,
+                                              height: 120,
+                                              fit: BoxFit.cover,
+                                              errorBuilder:
+                                                  (context, error, stackTrace) {
+                                                    print(
+                                                      'Image load error: $error',
+                                                    );
+                                                    return const Icon(
+                                                      Icons.business,
+                                                      size: 60,
+                                                      color: Colors.grey,
+                                                    );
+                                                  },
+                                            ),
+                                          )
+                                        : const Icon(
+                                            Icons.business,
+                                            size: 60,
+                                            color: Colors.grey,
+                                          ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      TextButton.icon(
+                                        onPressed: _pickLogo,
+                                        icon: const Icon(Icons.upload_file),
+                                        label: const Text('Upload Logo'),
+                                      ),
+                                      if (_logoFile != null ||
+                                          _logoPath != null)
+                                        TextButton.icon(
+                                          onPressed: _removeLogo,
+                                          icon: const Icon(
+                                            Icons.delete,
+                                            color: Colors.red,
+                                          ),
+                                          label: const Text(
+                                            'Remove',
+                                            style: TextStyle(color: Colors.red),
+                                          ),
+                                        ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const Divider(),
                             TextFormField(
                               controller: _nameController,
                               decoration: const InputDecoration(
@@ -179,8 +314,7 @@ class _CompanySettingsScreenState extends State<CompanySettingsScreen> {
                               maxLines: 2,
                             ),
                             const SizedBox(height: 12),
-                            // Region/State Dropdown
-                            DropdownButtonFormField<Region>(
+                            DropdownButtonFormField<Region?>(
                               value: _selectedRegion,
                               decoration: const InputDecoration(
                                 labelText: 'State/Region',
@@ -188,12 +322,12 @@ class _CompanySettingsScreenState extends State<CompanySettingsScreen> {
                                 prefixIcon: Icon(Icons.map),
                               ),
                               items: [
-                                const DropdownMenuItem(
+                                const DropdownMenuItem<Region?>(
                                   value: null,
                                   child: Text('Select State/Region'),
                                 ),
                                 ..._regions.map((region) {
-                                  return DropdownMenuItem(
+                                  return DropdownMenuItem<Region?>(
                                     value: region,
                                     child: Text(region.name),
                                   );
@@ -264,7 +398,7 @@ class _CompanySettingsScreenState extends State<CompanySettingsScreen> {
                                   _autoCashBook = value;
                                 });
                               },
-                              activeColor: Colors.green,
+                              activeThumbColor: Colors.green,
                             ),
                             const Divider(),
                             SwitchListTile(
@@ -278,8 +412,62 @@ class _CompanySettingsScreenState extends State<CompanySettingsScreen> {
                                   _autoBankBook = value;
                                 });
                               },
-                              activeColor: Colors.blue,
+                              activeThumbColor: Colors.blue,
                             ),
+
+                            const Divider(),
+                            Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 8),
+                              child: TextFormField(
+                                controller: _defaultMarkupController,
+                                decoration: const InputDecoration(
+                                  labelText: 'Default Markup %',
+                                  helperText:
+                                      'Applied to products without a category or product markup',
+                                  border: OutlineInputBorder(),
+                                  prefixIcon: Icon(Icons.trending_up),
+                                  suffixText: '%',
+                                ),
+                                keyboardType:
+                                    const TextInputType.numberWithOptions(
+                                      decimal: true,
+                                    ),
+                              ),
+                            ),
+
+                            const Divider(),
+                            SwitchListTile(
+                              title: const Text('VAT Enabled'),
+                              subtitle: const Text(
+                                'Turn off for businesses that do not charge VAT',
+                              ),
+                              value: _vatEnabled,
+                              onChanged: (value) {
+                                setState(() {
+                                  _vatEnabled = value;
+                                });
+                              },
+                              activeThumbColor: Colors.orange,
+                            ),
+                            if (_vatEnabled)
+                              Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 8,
+                                ),
+                                child: TextFormField(
+                                  controller: _vatRateController,
+                                  decoration: const InputDecoration(
+                                    labelText: 'VAT Rate',
+                                    border: OutlineInputBorder(),
+                                    prefixIcon: Icon(Icons.percent),
+                                    suffixText: '%',
+                                  ),
+                                  keyboardType:
+                                      const TextInputType.numberWithOptions(
+                                        decimal: true,
+                                      ),
+                                ),
+                              ),
                           ],
                         ),
                       ),
@@ -320,6 +508,8 @@ class _CompanySettingsScreenState extends State<CompanySettingsScreen> {
     _phoneController.dispose();
     _emailController.dispose();
     _taxIdController.dispose();
+    _defaultMarkupController.dispose();
+    _vatRateController.dispose();
     super.dispose();
   }
 }

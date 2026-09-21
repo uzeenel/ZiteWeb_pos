@@ -1,5 +1,5 @@
-import 'package:pos_system/models/product.dart';
-import 'package:pos_system/services/api_service.dart';
+import 'package:zite_web_pos/models/product.dart';
+import 'package:zite_web_pos/services/api_service.dart';
 
 class ProductService {
   Future<List<Product>> getAllProducts() async {

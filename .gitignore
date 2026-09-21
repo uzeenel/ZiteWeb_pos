@@ -67,3 +67,25 @@ aux
 .env
 .env.local
 
+# Node leftovers (from desktop project)
+node_modules/
+package.json
+package-lock.json
+
+# Backups, dumps, documents
+*.sql
+*.docx
+
+# Stray backup files
+*.broken
+*.bak
+
+# Licensing
+*.pem
+license.key
+license_private.pem
+license_public.pem
+
+# VS Code
+.vscode/
+lib/importantFile

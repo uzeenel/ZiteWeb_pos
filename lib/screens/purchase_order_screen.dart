@@ -1,16 +1,16 @@
 import 'package:flutter/material.dart';
 import 'dart:io';
 import 'package:path_provider/path_provider.dart';
-import 'package:pos_system/services/vendor_service.dart';
-import 'package:pos_system/services/product_service.dart';
-import 'package:pos_system/services/purchase_order_service.dart';
-import 'package:pos_system/services/unit_service.dart';
-import 'package:pos_system/services/company_service.dart';
-import 'package:pos_system/models/vendor.dart';
-import 'package:pos_system/models/product.dart';
-import 'package:pos_system/models/unit.dart';
-import 'package:pos_system/screens/unauthorized_screen.dart';
-import 'package:pos_system/utils/permissions.dart';
+import 'package:zite_web_pos/services/vendor_service.dart';
+import 'package:zite_web_pos/services/product_service.dart';
+import 'package:zite_web_pos/services/purchase_order_service.dart';
+import 'package:zite_web_pos/services/unit_service.dart';
+import 'package:zite_web_pos/services/company_service.dart';
+import 'package:zite_web_pos/models/vendor.dart';
+import 'package:zite_web_pos/models/product.dart';
+import 'package:zite_web_pos/models/unit.dart';
+import 'package:zite_web_pos/screens/unauthorized_screen.dart';
+import 'package:zite_web_pos/utils/permissions.dart';
 
 class PurchaseOrderScreen extends StatefulWidget {
   const PurchaseOrderScreen({super.key});
@@ -97,222 +97,302 @@ class _PurchaseOrderScreenState extends State<PurchaseOrderScreen> {
     List<Unit> availableUnits = [];
     TextEditingController quantityController = TextEditingController(text: '1');
     TextEditingController priceController = TextEditingController();
+    TextEditingController searchController = TextEditingController();
+    String searchQuery = '';
 
     showDialog(
       context: context,
+      barrierDismissible: false,
       builder: (context) {
         return StatefulBuilder(
           builder: (context, setState) {
+            final filteredProducts = searchQuery.isEmpty
+                ? _products
+                : _products
+                      .where(
+                        (p) =>
+                            p.name.toLowerCase().contains(
+                              searchQuery.toLowerCase(),
+                            ) ||
+                            p.sku.toLowerCase().contains(
+                              searchQuery.toLowerCase(),
+                            ),
+                      )
+                      .toList();
+
             return AlertDialog(
               title: const Text('Add Item'),
               content: SizedBox(
-                width: 400,
-                child: SingleChildScrollView(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      if (_selectedVendor != null)
-                        Container(
-                          padding: const EdgeInsets.all(8),
-                          margin: const EdgeInsets.only(bottom: 8),
-                          decoration: BoxDecoration(
-                            color: Colors.grey.shade100,
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Vendor: ${_selectedVendor!.name}',
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.bold,
+                width: 450,
+                height: 500,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (_selectedVendor != null)
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        margin: const EdgeInsets.only(bottom: 8),
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade100,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Vendor: ${_selectedVendor!.name}',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            if (_selectedVendor!.isVatRegistered)
+                              const Text(
+                                'VAT Registered',
+                                style: TextStyle(
+                                  color: Colors.green,
+                                  fontSize: 11,
                                 ),
                               ),
-                              if (_selectedVendor!.isVatRegistered)
-                                const Text(
-                                  'VAT Registered',
-                                  style: TextStyle(
-                                    color: Colors.green,
-                                    fontSize: 11,
-                                  ),
-                                ),
-                            ],
-                          ),
+                          ],
                         ),
+                      ),
 
-                      DropdownButtonFormField<Product>(
+                    TextField(
+                      controller: searchController,
+                      decoration: const InputDecoration(
+                        hintText: 'Search by name or SKU...',
+                        prefixIcon: Icon(Icons.search),
+                        border: OutlineInputBorder(),
+                        contentPadding: EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 10,
+                        ),
+                      ),
+                      onChanged: (value) {
+                        setState(() {
+                          searchQuery = value;
+                          if (selectedProduct != null) {
+                            final stillVisible = _products.any(
+                              (p) =>
+                                  p.id == selectedProduct!.id &&
+                                  (searchQuery.isEmpty ||
+                                      p.name.toLowerCase().contains(
+                                        searchQuery.toLowerCase(),
+                                      ) ||
+                                      p.sku.toLowerCase().contains(
+                                        searchQuery.toLowerCase(),
+                                      )),
+                            );
+                            if (!stillVisible) {
+                              selectedProduct = null;
+                              selectedUnit = null;
+                              availableUnits = [];
+                              priceController.clear();
+                            }
+                          }
+                        });
+                      },
+                    ),
+                    const SizedBox(height: 12),
+
+                    Container(
+                      decoration: BoxDecoration(
+                        border: Border.all(color: Colors.grey.shade400),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: DropdownButtonHideUnderline(
+                        child: DropdownButtonFormField<Product>(
+                          isExpanded: true,
+                          hint: Text(
+                            filteredProducts.isEmpty
+                                ? 'No products found'
+                                : 'Select a product',
+                            style: TextStyle(
+                              color: filteredProducts.isEmpty
+                                  ? Colors.red
+                                  : Colors.grey,
+                            ),
+                          ),
+                          value: selectedProduct,
+                          items: filteredProducts.map((p) {
+                            return DropdownMenuItem(
+                              value: p,
+                              child: Text(
+                                '${p.name} (${p.sku})${p.unitName != null ? " - ${p.unitName}" : ""}',
+                                overflow: TextOverflow.ellipsis,
+                                maxLines: 1,
+                              ),
+                            );
+                          }).toList(),
+                          onChanged: (value) async {
+                            setState(() {
+                              selectedProduct = value;
+                              selectedUnit = null;
+                              availableUnits = [];
+                              priceController.clear();
+                            });
+
+                            if (value != null) {
+                              final units = await _unitService
+                                  .getUnitsForProduct(value.id);
+                              setState(() {
+                                availableUnits = units;
+                                if (availableUnits.isNotEmpty) {
+                                  selectedUnit = availableUnits.first;
+                                  priceController.text = value.costPrice
+                                      .toString();
+                                }
+                              });
+                            }
+                          },
+                        ),
+                      ),
+                    ),
+
+                    const SizedBox(height: 12),
+
+                    if (selectedProduct != null && availableUnits.isNotEmpty)
+                      DropdownButtonFormField<Unit>(
                         isExpanded: true,
                         decoration: const InputDecoration(
-                          labelText: 'Product',
+                          labelText: 'Unit',
                           border: OutlineInputBorder(),
                         ),
-                        items: _products.map((p) {
+                        value: selectedUnit,
+                        items: availableUnits.map((u) {
+                          String unitText = u.name;
+                          if (u.conversionFactor != 1) {
+                            unitText =
+                                '${u.name} (1 ${u.symbol} = ${u.conversionFactor} ${u.baseUnitName})';
+                          }
                           return DropdownMenuItem(
-                            value: p,
+                            value: u,
                             child: Text(
-                              '${p.name} (${p.sku}) - Base unit: ${p.unitSymbol ?? "pcs"}',
+                              unitText,
                               overflow: TextOverflow.ellipsis,
                             ),
                           );
                         }).toList(),
-                        onChanged: (value) async {
+                        onChanged: (value) {
                           setState(() {
-                            selectedProduct = value;
-                            selectedUnit = null;
-                            availableUnits = [];
-                            priceController.clear();
+                            selectedUnit = value;
                           });
-
-                          if (value != null) {
-                            final units = await _unitService.getUnitsForProduct(
-                              value.id,
-                            );
-                            setState(() {
-                              availableUnits = units;
-                              if (availableUnits.isNotEmpty) {
-                                selectedUnit = availableUnits.first;
-                                priceController.text = value.costPrice
-                                    .toString();
-                              }
-                            });
-                          }
                         },
                       ),
 
-                      const SizedBox(height: 12),
+                    const SizedBox(height: 12),
 
-                      if (selectedProduct != null && availableUnits.isNotEmpty)
-                        DropdownButtonFormField<Unit>(
-                          isExpanded: true,
-                          decoration: const InputDecoration(
-                            labelText: 'Unit',
-                            border: OutlineInputBorder(),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: quantityController,
+                            decoration: InputDecoration(
+                              labelText: selectedUnit != null
+                                  ? 'Qty (${selectedUnit!.symbol})'
+                                  : 'Quantity',
+                              border: const OutlineInputBorder(),
+                            ),
+                            keyboardType: TextInputType.number,
                           ),
-                          initialValue: selectedUnit,
-                          items: availableUnits.map((u) {
-                            String unitText = u.name;
-                            if (u.conversionFactor != 1) {
-                              unitText =
-                                  '${u.name} (1 ${u.symbol} = ${u.conversionFactor} ${u.baseUnitName})';
-                            }
-                            return DropdownMenuItem(
-                              value: u,
-                              child: Text(
-                                unitText,
-                                overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: TextField(
+                            controller: priceController,
+                            decoration: const InputDecoration(
+                              labelText: 'Cost Price ₦',
+                              border: OutlineInputBorder(),
+                            ),
+                            keyboardType: TextInputType.number,
+                          ),
+                        ),
+                      ],
+                    ),
+
+                    if (selectedProduct != null &&
+                        selectedUnit != null &&
+                        priceController.text.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 8),
+                        child: Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: Colors.green.shade50,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                'Price/${selectedUnit!.symbol}: ₦${((double.tryParse(priceController.text) ?? 0) * selectedUnit!.conversionFactor).toStringAsFixed(2)}',
+                                style: const TextStyle(fontSize: 11),
                               ),
-                            );
-                          }).toList(),
-                          onChanged: (value) {
-                            setState(() {
-                              selectedUnit = value;
-                            });
-                          },
-                        ),
-
-                      const SizedBox(height: 12),
-
-                      TextField(
-                        controller: quantityController,
-                        decoration: InputDecoration(
-                          labelText: selectedUnit != null
-                              ? 'Quantity (${selectedUnit!.symbol})'
-                              : 'Quantity',
-                          border: const OutlineInputBorder(),
-                        ),
-                        keyboardType: TextInputType.number,
-                      ),
-
-                      const SizedBox(height: 12),
-
-                      TextField(
-                        controller: priceController,
-                        decoration: InputDecoration(
-                          labelText: selectedProduct != null
-                              ? 'Cost Price per ${selectedProduct!.unitSymbol ?? "base unit"} (₦)'
-                              : 'Cost Price (₦)',
-                          border: const OutlineInputBorder(),
-                        ),
-                        keyboardType: TextInputType.number,
-                      ),
-
-                      if (selectedProduct != null &&
-                          selectedUnit != null &&
-                          priceController.text.isNotEmpty)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 8),
-                          child: Container(
-                            padding: const EdgeInsets.all(8),
-                            decoration: BoxDecoration(
-                              color: Colors.green.shade50,
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Column(
-                              children: [
-                                Text(
-                                  'Price per ${selectedUnit!.symbol}: ₦${((double.tryParse(priceController.text) ?? 0) * selectedUnit!.conversionFactor).toStringAsFixed(2)}',
-                                  style: const TextStyle(fontSize: 11),
+                              Text(
+                                'Total: ₦${((double.tryParse(quantityController.text) ?? 0) * (double.tryParse(priceController.text) ?? 0) * selectedUnit!.conversionFactor).toStringAsFixed(2)}',
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 12,
+                                  color: Colors.green,
                                 ),
-                                Text(
-                                  'Total: ₦${((double.tryParse(quantityController.text) ?? 0) * (double.tryParse(priceController.text) ?? 0) * selectedUnit!.conversionFactor).toStringAsFixed(2)}',
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 12,
-                                    color: Colors.green,
-                                  ),
-                                ),
-                              ],
-                            ),
+                              ),
+                            ],
                           ),
                         ),
+                      ),
 
-                      if (selectedProduct != null && _selectedVendor != null)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 12),
-                          child: Container(
-                            padding: const EdgeInsets.all(8),
-                            decoration: BoxDecoration(
-                              color: Colors.blue.shade50,
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Text(
-                                  'VAT Info:',
+                    if (selectedProduct != null && _selectedVendor != null)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 8),
+                        child: Container(
+                          padding: const EdgeInsets.all(6),
+                          decoration: BoxDecoration(
+                            color: Colors.blue.shade50,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                _selectedVendor!.isVatRegistered &&
+                                        !selectedProduct!.isVatExempt
+                                    ? Icons.info_outline
+                                    : Icons.check_circle,
+                                size: 16,
+                                color:
+                                    _selectedVendor!.isVatRegistered &&
+                                        !selectedProduct!.isVatExempt
+                                    ? Colors.orange
+                                    : Colors.green,
+                              ),
+                              const SizedBox(width: 4),
+                              Expanded(
+                                child: Text(
+                                  _selectedVendor!.isVatRegistered &&
+                                          !selectedProduct!.isVatExempt
+                                      ? 'VAT (7.5%) will be applied'
+                                      : 'VAT exempt',
                                   style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 12,
+                                    fontSize: 10,
+                                    color:
+                                        _selectedVendor!.isVatRegistered &&
+                                            !selectedProduct!.isVatExempt
+                                        ? Colors.orange.shade700
+                                        : Colors.green.shade700,
                                   ),
                                 ),
-                                Text(
-                                  'Vendor: ${_selectedVendor!.isVatRegistered ? "VAT Registered" : "Not Registered"}',
-                                  style: const TextStyle(fontSize: 11),
-                                ),
-                                Text(
-                                  'Product: ${selectedProduct!.isVatExempt ? "VAT Exempt" : "VAT Applicable"}',
-                                  style: const TextStyle(fontSize: 11),
-                                ),
-                                if (_selectedVendor!.isVatRegistered &&
-                                    !selectedProduct!.isVatExempt)
-                                  const Text(
-                                    '→ VAT (7.5%) will be applied',
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      color: Colors.orange,
-                                    ),
-                                  ),
-                              ],
-                            ),
+                              ),
+                            ],
                           ),
                         ),
-                    ],
-                  ),
+                      ),
+                  ],
                 ),
               ),
               actions: [
                 TextButton(
-                  onPressed: () => Navigator.pop(context),
+                  onPressed: () {
+                    Navigator.pop(context);
+                  },
                   child: const Text('Cancel'),
                 ),
                 ElevatedButton(
@@ -345,10 +425,9 @@ class _PurchaseOrderScreenState extends State<PurchaseOrderScreen> {
                       return;
                     }
 
-                    final pricePerSellingUnit =
-                        pricePerBaseUnit * selectedUnit!.conversionFactor;
-                    final total = qty * pricePerSellingUnit;
-                    final baseQuantity = qty * selectedUnit!.conversionFactor;
+                    final qtyInSellingUnits = qty;
+                    final qtyInBaseUnits = qty * selectedUnit!.conversionFactor;
+                    final total = qtyInBaseUnits * pricePerBaseUnit;
 
                     _orderItems.add({
                       'productId': selectedProduct!.id,
@@ -358,12 +437,17 @@ class _PurchaseOrderScreenState extends State<PurchaseOrderScreen> {
                       'unitName': selectedUnit!.name,
                       'unitSymbol': selectedUnit!.symbol,
                       'conversionFactor': selectedUnit!.conversionFactor,
-                      'quantity': qty,
-                      'baseQuantity': baseQuantity,
-                      'unitPrice': pricePerSellingUnit,
+                      'quantity': qtyInSellingUnits,
+                      'baseQuantity': qtyInBaseUnits,
+                      'unitPrice': pricePerBaseUnit,
                       'total': total,
                       'isVatExempt': selectedProduct!.isVatExempt,
                     });
+
+                    // Dispose controllers after use
+                    searchController.dispose();
+                    quantityController.dispose();
+                    priceController.dispose();
 
                     Navigator.pop(context);
                     onItemAdded();
@@ -483,7 +567,6 @@ class _PurchaseOrderScreenState extends State<PurchaseOrderScreen> {
     final companyEmail = company?.email ?? '';
     final companyTaxId = company?.taxId ?? '';
 
-    // Build HTML content
     final StringBuffer html = StringBuffer();
 
     html.writeln('''
@@ -622,7 +705,7 @@ class _PurchaseOrderScreenState extends State<PurchaseOrderScreen> {
                     <td>${item['quantity']}</td>
                     <td>${_escapeHtml(item['unitSymbol'])}</td>
                     <td>${_escapeHtml(item['productName'])}</td>
-                    <td>₦${item['unitPrice'].toStringAsFixed(2)}</td>
+                    <td>₦${(item['unitPrice'] * item['conversionFactor']).toStringAsFixed(2)}</td>
                     <td>₦${item['total'].toStringAsFixed(2)}</td>
                 </tr>
       ''');
@@ -664,19 +747,17 @@ class _PurchaseOrderScreenState extends State<PurchaseOrderScreen> {
 </html>
     ''');
 
-    // Save to file and open in browser
     final directory = await getApplicationDocumentsDirectory();
     final fileName = 'PO_${poNumber.replaceAll('-', '_')}.html';
     final file = File('${directory.path}/$fileName');
 
     await file.writeAsString(html.toString());
 
-    // Open in default browser
     await Process.run('start', [file.path], runInShell: true);
 
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Opening print preview in browser...')),
+        const SnackBar(content: Text('Opening print preview in browser...')),
       );
     }
   }
@@ -692,7 +773,6 @@ class _PurchaseOrderScreenState extends State<PurchaseOrderScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // Check permissions - Only Admin and Manager can manage users
     if (!Permissions.canManagePurchaseOrders) {
       return const UnauthorizedScreen();
     }
@@ -716,7 +796,6 @@ class _PurchaseOrderScreenState extends State<PurchaseOrderScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Vendor Selection
                   Card(
                     child: Padding(
                       padding: const EdgeInsets.all(16),
@@ -776,7 +855,6 @@ class _PurchaseOrderScreenState extends State<PurchaseOrderScreen> {
 
                   const SizedBox(height: 16),
 
-                  // Order Items
                   Card(
                     child: Padding(
                       padding: const EdgeInsets.all(16),
@@ -885,7 +963,7 @@ class _PurchaseOrderScreenState extends State<PurchaseOrderScreen> {
                                               MainAxisAlignment.spaceBetween,
                                           children: [
                                             Text(
-                                              'Qty: ${item['quantity']} ${item['unitSymbol']} × ₦${item['unitPrice'].toStringAsFixed(2)}',
+                                              'Qty: ${item['quantity']} ${item['unitSymbol']} × ₦${(item['unitPrice'] * item['conversionFactor']).toStringAsFixed(2)}',
                                               style: const TextStyle(
                                                 fontSize: 11,
                                               ),

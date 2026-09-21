@@ -1,5 +1,5 @@
-import 'package:pos_system/models/user.dart';
-import 'package:pos_system/services/api_service.dart';
+import 'package:zite_web_pos/models/user.dart';
+import 'package:zite_web_pos/services/api_service.dart';
 
 class UserService {
   // Get all users

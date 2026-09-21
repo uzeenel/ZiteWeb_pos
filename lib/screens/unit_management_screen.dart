@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:pos_system/services/unit_service.dart';
-import 'package:pos_system/models/unit.dart';
-import 'package:pos_system/screens/unauthorized_screen.dart';
-import 'package:pos_system/utils/permissions.dart';
+import 'package:zite_web_pos/services/unit_service.dart';
+import 'package:zite_web_pos/models/unit.dart';
+import 'package:zite_web_pos/screens/unauthorized_screen.dart';
+import 'package:zite_web_pos/utils/permissions.dart';
 
 class UnitManagementScreen extends StatefulWidget {
   const UnitManagementScreen({super.key});
@@ -171,7 +171,7 @@ class _UnitManagementScreenState extends State<UnitManagementScreen> {
     final conversionController = TextEditingController(
       text: unit.conversionFactor.toString(),
     );
-    int? selectedBaseUnitId = unit.baseUnitId;
+    int? selectedBaseUnitId = unit.baseUnitId == 0 ? null : unit.baseUnitId;
     bool isBaseUnit = unit.isBaseUnit;
 
     showDialog(
@@ -208,23 +208,42 @@ class _UnitManagementScreenState extends State<UnitManagementScreen> {
                       onChanged: (value) {
                         setState(() {
                           isBaseUnit = value ?? false;
+                          // Reset base unit selection when changing to base unit
+                          if (isBaseUnit) {
+                            selectedBaseUnitId = null;
+                            conversionController.text = '1';
+                          }
                         });
                       },
                       contentPadding: EdgeInsets.zero,
                     ),
                     if (!isBaseUnit) ...[
-                      DropdownButtonFormField<int>(
+                      DropdownButtonFormField<int?>(
                         decoration: const InputDecoration(
                           labelText: 'Base Unit *',
                           border: OutlineInputBorder(),
+                          contentPadding: EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 8,
+                          ),
                         ),
-                        value: selectedBaseUnitId,
-                        items: _units.where((u) => u.isBaseUnit).map((u) {
-                          return DropdownMenuItem(
-                            value: u.id,
-                            child: Text('${u.name} (${u.symbol})'),
-                          );
-                        }).toList(),
+                        isExpanded: true,
+                        initialValue: selectedBaseUnitId,
+                        hint: const Text('Select Base Unit'),
+                        items: [
+                          const DropdownMenuItem<int?>(
+                            value: null,
+                            child: Text('-- Select Base Unit --'),
+                          ),
+                          ..._units
+                              .where((u) => u.isBaseUnit && u.id != unit.id)
+                              .map((u) {
+                                return DropdownMenuItem<int?>(
+                                  value: u.id,
+                                  child: Text('${u.name} (${u.symbol})'),
+                                );
+                              }),
+                        ],
                         onChanged: (value) {
                           setState(() {
                             selectedBaseUnitId = value;
@@ -260,11 +279,23 @@ class _UnitManagementScreenState extends State<UnitManagementScreen> {
                       );
                       return;
                     }
+
+                    // Validate base unit selection for non-base units
+                    if (!isBaseUnit && selectedBaseUnitId == null) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Please select a base unit'),
+                          backgroundColor: Colors.orange,
+                        ),
+                      );
+                      return;
+                    }
+
                     final updatedUnit = Unit(
                       id: unit.id,
                       name: nameController.text,
                       symbol: symbolController.text,
-                      baseUnitId: isBaseUnit ? 0 : selectedBaseUnitId ?? 0,
+                      baseUnitId: isBaseUnit ? 0 : (selectedBaseUnitId ?? 0),
                       baseUnitName: '',
                       conversionFactor: isBaseUnit
                           ? 1.0

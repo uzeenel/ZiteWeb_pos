@@ -1,5 +1,4 @@
-import 'package:pos_system/models/purchase_order.dart';
-import 'package:pos_system/services/api_service.dart';
+import 'package:zite_web_pos/services/api_service.dart';
 
 class PurchaseOrderService {
   // Get all purchase orders (returns List<Map<String, dynamic>> for list screens)
@@ -17,6 +16,9 @@ class PurchaseOrderService {
   Future<Map<String, dynamic>> getPurchaseOrderDetails(int id) async {
     try {
       final response = await ApiService.getPurchaseOrderDetail(id);
+      print('=== PO DETAILS RESPONSE ===');
+      print('Order: ${response['purchaseOrder']}');
+      print('Items: ${response['items']}');
       return {
         'order': response['purchaseOrder'] ?? {},
         'items': response['items'] ?? [],
@@ -57,7 +59,7 @@ class PurchaseOrderService {
         'items': items,
         'notes': notes,
         'createdBy': createdBy,
-        'invoiceNumber': invoiceNumber, // Include invoice number if provided
+        'invoice_number': invoiceNumber, // Include invoice number if provided
       };
 
       final response = await ApiService.createPurchaseOrder(poData);

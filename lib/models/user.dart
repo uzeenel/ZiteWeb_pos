@@ -36,14 +36,14 @@ class User {
 
   factory User.fromMap(Map<String, dynamic> map) {
     // Helper for safe string conversion
-    String _getString(dynamic value) {
+    String getString(dynamic value) {
       if (value == null) return '';
       if (value is String) return value;
       return value.toString();
     }
 
     // Helper for safe int conversion
-    int _getInt(dynamic value) {
+    int getInt(dynamic value) {
       if (value == null) return 0;
       if (value is int) return value;
       if (value is double) return value.toInt();
@@ -52,7 +52,7 @@ class User {
     }
 
     // Helper for safe double conversion
-    double _getDouble(dynamic value) {
+    double getDouble(dynamic value) {
       if (value == null) return 0.0;
       if (value is double) return value;
       if (value is int) return value.toDouble();
@@ -61,7 +61,7 @@ class User {
     }
 
     // Helper for safe bool conversion
-    bool _getBool(dynamic value) {
+    bool getBool(dynamic value) {
       if (value == null) return false;
       if (value is bool) return value;
       if (value is int) return value == 1;
@@ -70,7 +70,7 @@ class User {
     }
 
     // Helper for safe DateTime conversion
-    DateTime? _getDateTime(dynamic value) {
+    DateTime? getDateTime(dynamic value) {
       if (value == null) return null;
       if (value is DateTime) return value;
       try {
@@ -81,14 +81,14 @@ class User {
     }
 
     return User(
-      id: _getInt(map['id']),
-      username: _getString(map['username']),
-      password: _getString(map['password']),
-      fullName: _getString(map['full_name'] ?? map['fullName']),
-      role: _stringToRole(_getString(map['role'])),
-      isActive: _getBool(map['is_active']),
-      lastLogin: _getDateTime(map['last_login']),
-      createdAt: _getDateTime(map['created_at']) ?? DateTime.now(),
+      id: getInt(map['id']),
+      username: getString(map['username']),
+      password: getString(map['password']),
+      fullName: getString(map['full_name'] ?? map['fullName']),
+      role: _stringToRole(getString(map['role'])),
+      isActive: getBool(map['is_active']),
+      lastLogin: getDateTime(map['last_login']),
+      createdAt: getDateTime(map['created_at']) ?? DateTime.now(),
     );
   }
 

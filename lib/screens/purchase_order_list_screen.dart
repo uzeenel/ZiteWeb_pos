@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:pos_system/services/purchase_order_service.dart';
-import 'package:pos_system/services/company_service.dart';
+import 'package:zite_web_pos/services/purchase_order_service.dart';
+import 'package:zite_web_pos/services/company_service.dart';
 import 'dart:io';
 import 'package:path_provider/path_provider.dart';
 
@@ -484,6 +484,14 @@ class _PurchaseOrderListScreenState extends State<PurchaseOrderListScreen> {
                       itemCount: items.length,
                       itemBuilder: (context, index) {
                         final item = items[index];
+                        // Add debug print
+                        print('=== ITEM DEBUG ===');
+                        print('Product: ${item['product_name']}');
+                        print('Quantity from item: ${item['quantity']}');
+                        print(
+                          'Received quantity: ${item['received_quantity']}',
+                        );
+                        print('Full item: $item');
                         return Padding(
                           padding: const EdgeInsets.symmetric(vertical: 6),
                           child: Row(
@@ -500,7 +508,7 @@ class _PurchaseOrderListScreenState extends State<PurchaseOrderListScreen> {
                               SizedBox(
                                 width: 50,
                                 child: Text(
-                                  '${_toInt(item['quantity'])}',
+                                  '${item['quantity']}',
                                   textAlign: TextAlign.center,
                                   style: const TextStyle(fontSize: 13),
                                 ),

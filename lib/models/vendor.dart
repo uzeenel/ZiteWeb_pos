@@ -33,7 +33,7 @@ class Vendor {
 
   factory Vendor.fromMap(Map<String, dynamic> map) {
     // Helper function to safely convert to double
-    double _toDouble(dynamic value) {
+    double toDouble(dynamic value) {
       if (value == null) return 0.0;
       if (value is double) return value;
       if (value is int) return value.toDouble();
@@ -42,7 +42,7 @@ class Vendor {
     }
 
     // Helper function to safely convert to int
-    int _toInt(dynamic value) {
+    int toInt(dynamic value) {
       if (value == null) return 0;
       if (value is int) return value;
       if (value is double) return value.toInt();
@@ -51,13 +51,13 @@ class Vendor {
     }
 
     return Vendor(
-      id: _toInt(map['id']),
+      id: toInt(map['id']),
       name: map['name'] ?? '',
       contactPerson: map['contact_person'],
       phone: map['phone'],
       email: map['email'],
       address: map['address'],
-      stateId: map['state_id'] != null ? _toInt(map['state_id']) : null,
+      stateId: map['state_id'] != null ? toInt(map['state_id']) : null,
       stateName: map['state_name'],
       taxId: map['tax_id'],
       paymentTerms: map['payment_terms'],

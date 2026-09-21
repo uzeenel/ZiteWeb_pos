@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:pos_system/services/vendor_service.dart';
-import 'package:pos_system/models/vendor.dart';
-import 'package:pos_system/models/region.dart';
-import 'package:pos_system/screens/unauthorized_screen.dart';
-import 'package:pos_system/utils/permissions.dart';
+import 'package:zite_web_pos/services/vendor_service.dart';
+import 'package:zite_web_pos/models/vendor.dart';
+import 'package:zite_web_pos/models/region.dart';
+import 'package:zite_web_pos/screens/unauthorized_screen.dart';
+import 'package:zite_web_pos/utils/permissions.dart';
 
 class VendorManagementScreen extends StatefulWidget {
   const VendorManagementScreen({super.key});
@@ -113,7 +113,7 @@ class _VendorManagementScreenState extends State<VendorManagementScreen> {
                       ),
                       const SizedBox(height: 8),
                       DropdownButtonFormField<Region>(
-                        value: selectedState,
+                        initialValue: selectedState,
                         decoration: const InputDecoration(
                           labelText: 'State/Region',
                           border: OutlineInputBorder(),
@@ -303,7 +303,7 @@ class _VendorManagementScreenState extends State<VendorManagementScreen> {
                       ),
                       const SizedBox(height: 8),
                       DropdownButtonFormField<Region>(
-                        value: selectedState,
+                        initialValue: selectedState,
                         decoration: const InputDecoration(
                           labelText: 'State/Region',
                           border: OutlineInputBorder(),

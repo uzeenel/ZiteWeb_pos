@@ -1,5 +1,5 @@
-import 'package:pos_system/models/cash_book.dart';
-import 'package:pos_system/services/api_service.dart';
+import 'package:zite_web_pos/models/cash_book.dart';
+import 'package:zite_web_pos/services/api_service.dart';
 
 class CashBookService {
   // Get transactions by date range

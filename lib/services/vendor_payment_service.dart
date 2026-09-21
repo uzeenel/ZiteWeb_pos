@@ -1,5 +1,5 @@
-import 'package:pos_system/models/vendor_payment.dart';
-import 'package:pos_system/services/api_service.dart';
+import 'package:zite_web_pos/models/vendor_payment.dart';
+import 'package:zite_web_pos/services/api_service.dart';
 
 class VendorPaymentService {
   // Helper to safely convert to double
@@ -90,6 +90,7 @@ class VendorPaymentService {
     String? reference,
     String? notes,
     int? createdBy,
+    int? bankAccountId,
   }) async {
     try {
       final paymentData = {
@@ -101,6 +102,7 @@ class VendorPaymentService {
         'reference': reference,
         'notes': notes,
         'createdBy': createdBy,
+        'bankAccountId': bankAccountId,
       };
 
       final response = await ApiService.addVendorPayment(paymentData);

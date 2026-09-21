@@ -19,7 +19,7 @@ class Unit {
 
   factory Unit.fromMap(Map<String, dynamic> map) {
     // Helper function to safely convert to double
-    double _toDouble(dynamic value) {
+    double toDouble(dynamic value) {
       if (value == null) return 0.0;
       if (value is double) return value;
       if (value is int) return value.toDouble();
@@ -28,7 +28,7 @@ class Unit {
     }
 
     // Helper function to safely convert to int
-    int _toInt(dynamic value) {
+    int toInt(dynamic value) {
       if (value == null) return 0;
       if (value is int) return value;
       if (value is double) return value.toInt();
@@ -37,12 +37,12 @@ class Unit {
     }
 
     return Unit(
-      id: _toInt(map['id']),
-      baseUnitId: map['base_unit_id'] != null ? _toInt(map['base_unit_id']) : 0,
+      id: toInt(map['id']),
+      baseUnitId: map['base_unit_id'] != null ? toInt(map['base_unit_id']) : 0,
       baseUnitName: map['base_unit_name'] ?? '',
       name: map['name'] ?? '',
       symbol: map['symbol'] ?? '',
-      conversionFactor: _toDouble(map['conversion_factor']),
+      conversionFactor: toDouble(map['conversion_factor']),
       isBaseUnit: map['is_base_unit'] == 1,
     );
   }

@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:pos_system/models/user.dart';
-import 'package:pos_system/services/user_service.dart';
-import 'package:pos_system/screens/unauthorized_screen.dart';
-import 'package:pos_system/utils/permissions.dart';
+import 'package:zite_web_pos/models/user.dart';
+import 'package:zite_web_pos/services/user_service.dart';
+import 'package:zite_web_pos/screens/unauthorized_screen.dart';
+import 'package:zite_web_pos/utils/permissions.dart';
 
 class UserManagementScreen extends StatefulWidget {
   const UserManagementScreen({super.key});
@@ -92,7 +92,7 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
                     ),
                     const SizedBox(height: 8),
                     DropdownButtonFormField<UserRole>(
-                      value: selectedRole,
+                      initialValue: selectedRole,
                       decoration: const InputDecoration(
                         labelText: 'Role',
                         border: OutlineInputBorder(),
@@ -190,7 +190,7 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
                     ),
                     const SizedBox(height: 8),
                     DropdownButtonFormField<UserRole>(
-                      value: selectedRole,
+                      initialValue: selectedRole,
                       decoration: const InputDecoration(
                         labelText: 'Role',
                         border: OutlineInputBorder(),
@@ -425,7 +425,7 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
                         ),
                         child: ListTile(
                           leading: CircleAvatar(
-                            backgroundColor: roleColor.withOpacity(0.1),
+                            backgroundColor: roleColor.withValues(alpha: 0.1),
                             child: Icon(
                               user.role == UserRole.admin
                                   ? Icons.admin_panel_settings

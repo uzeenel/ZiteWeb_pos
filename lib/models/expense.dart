@@ -22,6 +22,7 @@ enum ExpenseCategory {
   security,
   internet,
   phone,
+  electricity,
   bank_charges,
   subscriptions,
   refunds,
@@ -41,8 +42,12 @@ class Expense {
   String description;
   String? reference;
   String? vendor;
+  final String? paymentMethod;
   int? userId;
   DateTime createdAt;
+  final String? accountName;
+  final String? bankName;
+  final int? bankAccountId;
 
   Expense({
     this.id,
@@ -52,8 +57,12 @@ class Expense {
     required this.description,
     this.reference,
     this.vendor,
+    this.paymentMethod,
     this.userId,
     required this.createdAt,
+    this.accountName,
+    this.bankName,
+    this.bankAccountId,
   });
 
   Map<String, dynamic> toMap() {
@@ -65,22 +74,30 @@ class Expense {
       'description': description,
       'reference': reference,
       'vendor': vendor,
+      'payment_method': paymentMethod,
       'user_id': userId,
       'created_at': createdAt.toIso8601String(),
+      'account_name': accountName,
+      'bank_name': bankName,
+      'bank_account_id': bankAccountId,
     };
   }
 
   factory Expense.fromMap(Map<String, dynamic> map) {
     return Expense(
       id: map['id'],
-      date: DateTime.parse(map['date']),
-      category: stringToCategory(map['category']),
-      amount: map['amount'].toDouble(),
-      description: map['description'],
+      date: map['date'] != null ? DateTime.parse(map['date']) : DateTime.now(),
+      category: stringToCategory(map['category'] ?? 'other'),
+      amount: (map['amount'] is num)
+          ? (map['amount'] as num).toDouble()
+          : double.tryParse(map['amount'].toString()) ?? 0.0,
+      description: map['description'] ?? '',
       reference: map['reference'],
       vendor: map['vendor'],
-      userId: map['user_id'],
+      paymentMethod: map['payment_method'] ?? map['paymentMethod'] ?? 'cash',
       createdAt: DateTime.parse(map['created_at']),
+      accountName: map['account_name'],
+      bankName: map['bank_name'],
     );
   }
 
@@ -132,6 +149,8 @@ class Expense {
         return 'internet';
       case ExpenseCategory.phone:
         return 'phone';
+      case ExpenseCategory.electricity:
+        return 'electricity';
       case ExpenseCategory.bank_charges:
         return 'bank_charges';
       case ExpenseCategory.subscriptions:
@@ -201,6 +220,8 @@ class Expense {
         return ExpenseCategory.internet;
       case 'phone':
         return ExpenseCategory.phone;
+      case 'electricity':
+        return ExpenseCategory.electricity;
       case 'bank_charges':
         return ExpenseCategory.bank_charges;
       case 'subscriptions':

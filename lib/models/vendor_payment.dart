@@ -30,7 +30,7 @@ class VendorPayment {
   });
 
   factory VendorPayment.fromMap(Map<String, dynamic> map) {
-    double _toDouble(dynamic value) {
+    double toDouble(dynamic value) {
       if (value == null) return 0.0;
       if (value is double) return value;
       if (value is int) return value.toDouble();
@@ -38,7 +38,7 @@ class VendorPayment {
       return 0.0;
     }
 
-    int _toInt(dynamic value) {
+    int toInt(dynamic value) {
       if (value == null) return 0;
       if (value is int) return value;
       if (value is double) return value.toInt();
@@ -47,15 +47,15 @@ class VendorPayment {
     }
 
     return VendorPayment(
-      id: _toInt(map['id']),
-      vendorId: _toInt(map['vendor_id']),
+      id: toInt(map['id']),
+      vendorId: toInt(map['vendor_id']),
       vendorName: map['vendor_name'],
       purchaseOrderId: map['purchase_order_id'] != null
-          ? _toInt(map['purchase_order_id'])
+          ? toInt(map['purchase_order_id'])
           : null,
       purchaseOrderNumber: map['purchase_order_number'],
       paymentDate: DateTime.parse(map['payment_date']),
-      amount: _toDouble(map['amount']),
+      amount: toDouble(map['amount']),
       paymentMethod: map['payment_method'] ?? 'Cash',
       reference: map['reference'],
       notes: map['notes'],

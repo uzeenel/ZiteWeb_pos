@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:pos_system/services/customer_service.dart';
-import 'package:pos_system/models/customer.dart';
-import 'package:pos_system/models/region.dart';
+import 'package:zite_web_pos/services/customer_service.dart';
+import 'package:zite_web_pos/models/customer.dart';
+import 'package:zite_web_pos/models/region.dart';
 
 class CustomerScreen extends StatefulWidget {
   const CustomerScreen({super.key});
@@ -110,7 +110,7 @@ class _CustomerScreenState extends State<CustomerScreen> {
                       ),
                       const SizedBox(height: 8),
                       DropdownButtonFormField<Region>(
-                        value: selectedState,
+                        initialValue: selectedState,
                         decoration: const InputDecoration(
                           labelText: 'State/Region',
                           border: OutlineInputBorder(),
@@ -298,7 +298,7 @@ class _CustomerScreenState extends State<CustomerScreen> {
                       ),
                       const SizedBox(height: 8),
                       DropdownButtonFormField<Region>(
-                        value: selectedState,
+                        initialValue: selectedState,
                         decoration: const InputDecoration(
                           labelText: 'State/Region',
                           border: OutlineInputBorder(),

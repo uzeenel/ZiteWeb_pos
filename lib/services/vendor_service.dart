@@ -1,6 +1,6 @@
-import 'package:pos_system/models/vendor.dart';
-import 'package:pos_system/models/region.dart';
-import 'package:pos_system/services/api_service.dart';
+import 'package:zite_web_pos/models/vendor.dart';
+import 'package:zite_web_pos/models/region.dart';
+import 'package:zite_web_pos/services/api_service.dart';
 
 class VendorService {
   // Get all vendors

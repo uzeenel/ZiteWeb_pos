@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:pos_system/screens/home_screen.dart';
-import 'package:pos_system/services/auth_service.dart';
-import 'package:pos_system/screens/pos_screen.dart';
+import 'package:zite_web_pos/services/auth_service.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -18,34 +16,21 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _obscurePassword = true;
 
   Future<void> _login() async {
-    if (_usernameController.text.isEmpty || _passwordController.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter username and password')),
-      );
-      return;
-    }
+    setState(() {
+      _isLoading = true;
+    });
 
-    print('=== LOGIN FROM APP ===');
-    print('Username: ${_usernameController.text}');
-    print('Password: ${_passwordController.text}');
+    final username = _usernameController.text.trim();
+    final password = _passwordController.text.trim();
 
-    setState(() => _isLoading = true);
+    final success = await _authService.login(username, password);
 
-    final success = await _authService.login(
-      _usernameController.text,
-      _passwordController.text,
-    );
-
-    print('Login success: $success');
-
-    setState(() => _isLoading = false);
+    setState(() {
+      _isLoading = false;
+    });
 
     if (success) {
-      print('Navigating to HomeScreen');
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => const HomeScreen()),
-      );
+      Navigator.pushReplacementNamed(context, '/home');
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -56,23 +41,23 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
+
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       body: Container(
-        decoration: BoxDecoration(
+        decoration: const BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: [
-              const Color(0xFF1e3a8a).withOpacity(0.9),
-              const Color(0xFF1e3a8a),
-            ],
+            colors: [Color(0xFF0a0a0a), Color(0xFF1a1a2e)],
           ),
         ),
         child: Center(
           child: Card(
             elevation: 8,
+            color: Colors.grey.shade900,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(16),
             ),
@@ -82,37 +67,57 @@ class _LoginScreenState extends State<LoginScreen> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(
-                    Icons.shopping_cart,
-                    size: 80,
-                    color: const Color(0xFF1e3a8a),
+                  Image.asset(
+                    'assets/images/cologo.png',
+                    height: 80,
+                    width: 80,
                   ),
                   const SizedBox(height: 16),
                   const Text(
-                    'POS System',
-                    style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                    'ZiteMart',
+                    style: TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
                   ),
                   const SizedBox(height: 32),
                   TextField(
                     controller: _usernameController,
+                    style: const TextStyle(color: Colors.white),
+                    cursorColor: Colors.white,
                     decoration: const InputDecoration(
                       labelText: 'Username',
                       prefixIcon: Icon(Icons.person),
+                      labelStyle: TextStyle(color: Colors.white30),
                       border: OutlineInputBorder(),
+                      enabledBorder: OutlineInputBorder(
+                        borderSide: BorderSide(color: Colors.white30),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderSide: BorderSide(color: Colors.yellow),
+                      ),
                     ),
                     onSubmitted: (_) => _login(),
                   ),
                   const SizedBox(height: 16),
                   TextField(
                     controller: _passwordController,
+                    style: const TextStyle(color: Colors.white),
+                    cursorColor: Colors.white,
                     decoration: InputDecoration(
                       labelText: 'Password',
                       prefixIcon: const Icon(Icons.lock),
+                      labelStyle: const TextStyle(color: Colors.white70),
+                      enabledBorder: const OutlineInputBorder(
+                        borderSide: BorderSide(color: Colors.white30),
+                      ),
                       suffixIcon: IconButton(
                         icon: Icon(
                           _obscurePassword
                               ? Icons.visibility
                               : Icons.visibility_off,
+                          color: Colors.white70,
                         ),
                         onPressed: () {
                           setState(() {
@@ -148,7 +153,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                   const SizedBox(height: 16),
                   Text(
-                    'Demo: admin / admin123',
+                    'ZiteMart POS System - Version 1.0.0',
                     style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
                   ),
                 ],

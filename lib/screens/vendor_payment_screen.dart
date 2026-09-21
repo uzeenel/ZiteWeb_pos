@@ -1,12 +1,75 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:pos_system/models/vendor_payment.dart';
-import 'package:pos_system/services/vendor_payment_service.dart';
-import 'package:pos_system/services/vendor_service.dart';
-import 'package:pos_system/services/purchase_order_service.dart';
-import 'package:pos_system/models/vendor.dart';
-import 'package:pos_system/screens/unauthorized_screen.dart';
-import 'package:pos_system/utils/permissions.dart';
+import 'package:http/http.dart' as http;
+import 'package:zite_web_pos/models/vendor_payment.dart';
+import 'package:zite_web_pos/services/vendor_payment_service.dart';
+import 'package:zite_web_pos/services/vendor_service.dart';
+import 'package:zite_web_pos/services/purchase_order_service.dart';
+import 'package:zite_web_pos/services/api_service.dart';
+import 'package:zite_web_pos/models/vendor.dart';
+import 'package:zite_web_pos/screens/unauthorized_screen.dart';
+import 'package:zite_web_pos/utils/permissions.dart';
+import 'package:zite_web_pos/models/bank_account.dart';
+import 'package:zite_web_pos/services/bank_service.dart';
+
+// Invoice Model
+class VendorInvoice {
+  final String invoiceNumber;
+  final DateTime invoiceDate;
+  final List<PurchaseOrderSummary> purchaseOrders;
+  final double total;
+  final double paid;
+  final double balance;
+
+  VendorInvoice({
+    required this.invoiceNumber,
+    required this.invoiceDate,
+    required this.purchaseOrders,
+    required this.total,
+    required this.paid,
+    required this.balance,
+  });
+
+  factory VendorInvoice.fromMap(Map<String, dynamic> map) {
+    return VendorInvoice(
+      invoiceNumber: map['invoice_number'],
+      invoiceDate: DateTime.parse(map['invoice_date']),
+      purchaseOrders: (map['purchase_orders'] as List)
+          .map((po) => PurchaseOrderSummary.fromMap(po))
+          .toList(),
+      total: (map['total'] as num).toDouble(),
+      paid: (map['paid'] as num).toDouble(),
+      balance: (map['balance'] as num).toDouble(),
+    );
+  }
+}
+
+class PurchaseOrderSummary {
+  final int id;
+  final String poNumber;
+  final double total;
+  final double paid;
+  final double balance;
+
+  PurchaseOrderSummary({
+    required this.id,
+    required this.poNumber,
+    required this.total,
+    required this.paid,
+    required this.balance,
+  });
+
+  factory PurchaseOrderSummary.fromMap(Map<String, dynamic> map) {
+    return PurchaseOrderSummary(
+      id: map['id'],
+      poNumber: map['po_number'],
+      total: (map['total'] as num).toDouble(),
+      paid: (map['paid'] as num).toDouble(),
+      balance: (map['balance'] as num).toDouble(),
+    );
+  }
+}
 
 class VendorPaymentScreen extends StatefulWidget {
   const VendorPaymentScreen({super.key});
@@ -22,8 +85,7 @@ class _VendorPaymentScreenState extends State<VendorPaymentScreen> {
 
   List<VendorPaymentSummary> _summaries = [];
   List<Vendor> _vendors = [];
-  List<Map<String, dynamic>> _vendorPOs = [];
-  List<VendorPayment> _selectedVendorPayments = [];
+  final List<VendorPayment> _selectedVendorPayments = [];
   bool _isLoading = true;
   String _searchQuery = '';
   Vendor? _selectedVendor;
@@ -64,25 +126,6 @@ class _VendorPaymentScreenState extends State<VendorPaymentScreen> {
     });
   }
 
-  Future<void> _loadVendorDetails(Vendor vendor) async {
-    setState(() => _isLoading = true);
-    final allPOs = await _poService.getAllPurchaseOrders();
-    final vendorPOs = allPOs
-        .where(
-          (po) =>
-              _toInt(po['vendor_id']) == vendor.id &&
-              po['status'] == 'received',
-        )
-        .toList();
-    final payments = await _paymentService.getPaymentsByVendor(vendor.id);
-    setState(() {
-      _selectedVendor = vendor;
-      _vendorPOs = vendorPOs;
-      _selectedVendorPayments = payments;
-      _isLoading = false;
-    });
-  }
-
   List<VendorPaymentSummary> get _filteredSummaries {
     if (_searchQuery.isEmpty) return _summaries;
     return _summaries.where((s) {
@@ -91,495 +134,599 @@ class _VendorPaymentScreenState extends State<VendorPaymentScreen> {
   }
 
   double _getPaidForPO(int poId) {
-    return _selectedVendorPayments
+    final paid = _selectedVendorPayments
         .where((p) => p.purchaseOrderId == poId)
         .fold(0.0, (sum, p) => sum + p.amount);
+    print('_getPaidForPO($poId) = $paid');
+    return paid;
   }
 
-  void _showAddPaymentDialog({int? poId}) {
-    Vendor? selectedVendor = _selectedVendor;
+  // Fetch invoices grouped by invoice number
+  Future<List<VendorInvoice>> _getVendorInvoices(int vendorId) async {
+    try {
+      print('=== GETTING VENDOR INVOICES ===');
+      print('Vendor ID: $vendorId');
+
+      final response = await ApiService.getVendorInvoices(vendorId);
+      print('API Response length: ${response.length}');
+
+      if (response.isNotEmpty) {
+        print('Has API invoices, using them');
+        return response.map((i) => VendorInvoice.fromMap(i)).toList();
+      }
+
+      print('No API invoices, trying fallback...');
+
+      // Fallback: If no invoices with numbers, show POs grouped by PO number
+      final allPOs = await _poService.getAllPurchaseOrders();
+      print('Total POs from service: ${allPOs.length}');
+
+      final vendorPOs = allPOs
+          .where(
+            (po) =>
+                _toInt(po['vendor_id']) == vendorId &&
+                po['status'] == 'received',
+          )
+          .toList();
+
+      print('Vendor POs (received): ${vendorPOs.length}');
+      for (var po in vendorPOs) {
+        print(
+          '  PO: ${po['po_number']}, Total: ${po['total']}, Paid: ${_getPaidForPO(_toInt(po['id']))}',
+        );
+      }
+
+      if (vendorPOs.isEmpty) return [];
+
+      // Convert each PO to an "invoice" using PO number as identifier
+      final List<VendorInvoice> fallbackInvoices = [];
+      for (var po in vendorPOs) {
+        final poId = _toInt(po['id']);
+        final poTotal = _toDouble(po['total']);
+        final poPaid = _getPaidForPO(poId);
+        final balance = poTotal - poPaid;
+
+        print('PO: ${po['po_number']}, Balance: $balance');
+
+        if (balance > 0) {
+          fallbackInvoices.add(
+            VendorInvoice(
+              invoiceNumber: po['po_number'],
+              invoiceDate: DateTime.parse(po['order_date']),
+              purchaseOrders: [
+                PurchaseOrderSummary(
+                  id: poId,
+                  poNumber: po['po_number'],
+                  total: poTotal,
+                  paid: poPaid,
+                  balance: balance,
+                ),
+              ],
+              total: poTotal,
+              paid: poPaid,
+              balance: balance,
+            ),
+          );
+        }
+      }
+
+      print('Fallback invoices count: ${fallbackInvoices.length}');
+      return fallbackInvoices;
+    } catch (e) {
+      print('Error fetching vendor invoices: $e');
+      return [];
+    }
+  }
+
+  void _showAddPaymentDialog({
+    int? poId,
+    String? invoiceNumber,
+    Vendor? vendor,
+    double? invoiceTotal,
+  }) {
+    Vendor? selectedVendor = vendor ?? _selectedVendor;
     int? selectedPOId = poId;
     TextEditingController amountController = TextEditingController();
     TextEditingController referenceController = TextEditingController();
     TextEditingController notesController = TextEditingController();
+    TextEditingController invoiceNumberController = TextEditingController(
+      text: invoiceNumber ?? '',
+    );
     DateTime selectedDate = DateTime.now();
     String selectedMethod = 'Bank Transfer';
     List<Map<String, dynamic>> availablePOs = [];
-    List<VendorPayment> _dialogVendorPayments = [];
 
-    _loadPaymentDialogData() async {
-      if (selectedVendor != null) {
-        final allPOs = await _poService.getAllPurchaseOrders();
-        final vendorPayments = await _paymentService.getPaymentsByVendor(
-          selectedVendor!.id,
-        );
+    // Bank account related variables
+    List<BankAccount> bankAccounts = [];
+    bool isLoadingAccounts = false;
+    BankAccount? selectedBankAccount;
 
-        final Map<int, double> paidAmounts = {};
-        for (var payment in vendorPayments) {
-          if (payment.purchaseOrderId != null) {
-            paidAmounts[payment.purchaseOrderId!] =
-                (paidAmounts[payment.purchaseOrderId] ?? 0) + payment.amount;
-          }
-        }
-
-        final List<Map<String, dynamic>> tempPOs = [];
-        final Set<int> uniqueIds = {};
-
-        for (var po in allPOs) {
-          final poIdValue = _toInt(po['id']);
-          if (_toInt(po['vendor_id']) == selectedVendor!.id &&
-              po['status'] == 'received' &&
-              !uniqueIds.contains(poIdValue)) {
-            double total = _toDouble(po['total']);
-            double paid = paidAmounts[poIdValue] ?? 0;
-            if (total - paid > 0) {
-              tempPOs.add(po);
-              uniqueIds.add(poIdValue);
-            }
-          }
-        }
-
-        return {'pos': tempPOs, 'payments': vendorPayments};
-      }
-      return {'pos': <Map<String, dynamic>>[], 'payments': <VendorPayment>[]};
+    if (invoiceTotal != null && invoiceTotal > 0) {
+      amountController.text = invoiceTotal.toString();
     }
 
     showDialog(
       context: context,
       builder: (context) {
-        return FutureBuilder(
-          future: _loadPaymentDialogData(),
-          builder: (context, snapshot) {
-            if (snapshot.connectionState == ConnectionState.waiting) {
-              return const Center(child: CircularProgressIndicator());
+        return StatefulBuilder(
+          builder: (context, setStateDialog) {
+            // Load bank accounts when dialog opens
+            if (bankAccounts.isEmpty && !isLoadingAccounts) {
+              isLoadingAccounts = true;
+              BankService.getBankAccounts()
+                  .then((accounts) {
+                    setStateDialog(() {
+                      bankAccounts = accounts;
+                      isLoadingAccounts = false;
+                    });
+                  })
+                  .catchError((e) {
+                    print('Error loading bank accounts: $e');
+                    setStateDialog(() {
+                      isLoadingAccounts = false;
+                    });
+                  });
             }
 
-            if (snapshot.hasData && snapshot.data != null) {
-              final data = snapshot.data as Map<String, dynamic>;
-              availablePOs = List<Map<String, dynamic>>.from(data['pos']);
-              _dialogVendorPayments = List<VendorPayment>.from(
-                data['payments'],
-              );
-
-              if (selectedPOId != null) {
-                final selectedPO = availablePOs.firstWhere(
-                  (po) => _toInt(po['id']) == selectedPOId,
-                  orElse: () => {},
-                );
-                if (selectedPO.isNotEmpty) {
-                  double total = _toDouble(selectedPO['total']);
-                  double paid = 0;
-                  for (var payment in _dialogVendorPayments) {
-                    if (payment.purchaseOrderId == selectedPOId) {
-                      paid += payment.amount;
-                    }
-                  }
-                  double balance = total - paid;
-                  amountController.text = balance.toString();
-                }
-              }
-            }
-
-            return StatefulBuilder(
-              builder: (context, setStateDialog) {
-                return AlertDialog(
-                  title: const Text('Record Vendor Payment'),
-                  content: SizedBox(
-                    width: 450,
-                    child: SingleChildScrollView(
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          // Vendor dropdown
-                          IgnorePointer(
-                            ignoring: selectedPOId != null,
-                            child: DropdownButtonFormField<Vendor>(
-                              decoration: const InputDecoration(
-                                labelText: 'Vendor *',
-                                border: OutlineInputBorder(),
-                              ),
-                              isExpanded: true,
-                              value: selectedVendor,
-                              items: _vendors.map((v) {
-                                return DropdownMenuItem(
-                                  value: v,
-                                  child: Text(v.name),
-                                );
-                              }).toList(),
-                              onChanged: (value) async {
-                                if (value != null && selectedPOId == null) {
-                                  setStateDialog(() {
-                                    selectedVendor = value;
-                                    selectedPOId = null;
-                                    amountController.clear();
-                                  });
-                                  final allPOs = await _poService
-                                      .getAllPurchaseOrders();
-                                  final vendorPayments = await _paymentService
-                                      .getPaymentsByVendor(value.id);
-
-                                  final Map<int, double> paidAmounts = {};
-                                  for (var payment in vendorPayments) {
-                                    if (payment.purchaseOrderId != null) {
-                                      paidAmounts[payment.purchaseOrderId!] =
-                                          (paidAmounts[payment
-                                                  .purchaseOrderId] ??
-                                              0) +
-                                          payment.amount;
-                                    }
-                                  }
-
-                                  final List<Map<String, dynamic>> tempPOs = [];
-                                  final Set<int> uniqueIds = {};
-
-                                  for (var po in allPOs) {
-                                    final poIdValue = _toInt(po['id']);
-                                    if (_toInt(po['vendor_id']) == value.id &&
-                                        po['status'] == 'received' &&
-                                        !uniqueIds.contains(poIdValue)) {
-                                      double total = _toDouble(po['total']);
-                                      double paid = paidAmounts[poIdValue] ?? 0;
-                                      if (total - paid > 0) {
-                                        tempPOs.add(po);
-                                        uniqueIds.add(poIdValue);
-                                      }
-                                    }
-                                  }
-
-                                  setStateDialog(() {
-                                    availablePOs = tempPOs;
-                                    _dialogVendorPayments = vendorPayments;
-                                  });
-                                }
-                              },
-                            ),
+            return AlertDialog(
+              title: const Text('Record Vendor Payment'),
+              content: SizedBox(
+                width: 450,
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // Vendor dropdown (only if no vendor preselected)
+                      if (invoiceNumber == null)
+                        Container(
+                          constraints: const BoxConstraints(
+                            maxWidth: double.infinity,
                           ),
-                          const SizedBox(height: 12),
-
-                          // PO dropdown - Simplified single line layout
-                          DropdownButtonFormField<int?>(
+                          child: DropdownButtonFormField<Vendor>(
                             decoration: const InputDecoration(
-                              labelText: 'Purchase Order (Optional)',
+                              labelText: 'Vendor *',
                               border: OutlineInputBorder(),
+                              contentPadding: EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 8,
+                              ),
                             ),
                             isExpanded: true,
-                            value: selectedPOId,
-                            hint: const Text('-- No PO (Direct Payment) --'),
-                            items: [
-                              const DropdownMenuItem<int?>(
-                                value: null,
-                                child: Text('-- No PO (Direct Payment) --'),
-                              ),
-                              ...availablePOs.map((po) {
-                                final poIdValue = _toInt(po['id']);
-                                final total = _toDouble(po['total']);
-
-                                double paid = 0;
-                                for (var payment in _dialogVendorPayments) {
-                                  if (payment.purchaseOrderId == poIdValue) {
-                                    paid += payment.amount;
-                                  }
-                                }
-
-                                final balance = total - paid;
-                                final invoiceNumber = po['invoice_number'];
-
-                                // Combine all information into a single line to avoid layout issues
-                                String displayText = po['po_number'];
-                                if (invoiceNumber != null &&
-                                    invoiceNumber.toString().isNotEmpty) {
-                                  displayText += ' (Inv: $invoiceNumber)';
-                                }
-                                displayText +=
-                                    ' | ₦${_currencyFormat.format(total)} | Bal: ₦${_currencyFormat.format(balance)}';
-
-                                return DropdownMenuItem<int?>(
-                                  value: poIdValue,
-                                  child: Text(
-                                    displayText,
-                                    overflow: TextOverflow.ellipsis,
-                                    maxLines: 1,
-                                    style: const TextStyle(fontSize: 12),
-                                  ),
-                                );
-                              }),
-                            ],
-                            onChanged: (value) {
-                              setStateDialog(() {
-                                selectedPOId = value;
-                                if (value != null) {
-                                  final selectedPO = availablePOs.firstWhere(
-                                    (po) => _toInt(po['id']) == value,
-                                    orElse: () => {},
-                                  );
-                                  if (selectedPO.isNotEmpty) {
-                                    double total = _toDouble(
-                                      selectedPO['total'],
-                                    );
-                                    double paid = 0;
-                                    for (var payment in _dialogVendorPayments) {
-                                      if (payment.purchaseOrderId == value) {
-                                        paid += payment.amount;
-                                      }
-                                    }
-                                    double balance = total - paid;
-                                    amountController.text = balance.toString();
-                                  }
-                                } else {
+                            initialValue: selectedVendor,
+                            items: _vendors.map((v) {
+                              return DropdownMenuItem(
+                                value: v,
+                                child: Text(
+                                  v.name,
+                                  overflow: TextOverflow.ellipsis,
+                                  maxLines: 1,
+                                ),
+                              );
+                            }).toList(),
+                            onChanged: (value) async {
+                              if (value != null) {
+                                setStateDialog(() {
+                                  selectedVendor = value;
+                                  selectedPOId = null;
                                   amountController.clear();
+                                  availablePOs.clear();
+                                });
+
+                                final allPOs = await _poService
+                                    .getAllPurchaseOrders();
+                                final vendorPayments = await _paymentService
+                                    .getPaymentsByVendor(value.id);
+
+                                final Map<int, double> paidAmounts = {};
+                                for (var payment in vendorPayments) {
+                                  if (payment.purchaseOrderId != null) {
+                                    paidAmounts[payment.purchaseOrderId!] =
+                                        (paidAmounts[payment.purchaseOrderId] ??
+                                            0) +
+                                        payment.amount;
+                                  }
                                 }
-                              });
+
+                                final List<Map<String, dynamic>> tempPOs = [];
+                                final Set<int> uniqueIds = {};
+
+                                for (var po in allPOs) {
+                                  final poIdValue = _toInt(po['id']);
+                                  if (_toInt(po['vendor_id']) == value.id &&
+                                      po['status'] == 'received' &&
+                                      !uniqueIds.contains(poIdValue)) {
+                                    double total = _toDouble(po['total']);
+                                    double paid = paidAmounts[poIdValue] ?? 0;
+                                    if (total - paid > 0) {
+                                      tempPOs.add(po);
+                                      uniqueIds.add(poIdValue);
+                                    }
+                                  }
+                                }
+
+                                setStateDialog(() {
+                                  availablePOs = tempPOs;
+                                });
+                              }
                             },
                           ),
-                          const SizedBox(height: 12),
+                        ),
 
-                          // PO Details Card
-                          if (selectedPOId != null &&
-                              availablePOs.isNotEmpty) ...[
-                            Builder(
-                              builder: (context) {
+                      if (invoiceNumber == null) const SizedBox(height: 12),
+
+                      // Invoice Number field
+                      TextField(
+                        controller: invoiceNumberController,
+                        decoration: InputDecoration(
+                          labelText: 'Invoice Number *',
+                          border: OutlineInputBorder(),
+                          prefixIcon: const Icon(Icons.receipt),
+                          enabled: invoiceNumber == null,
+                        ),
+                        readOnly: invoiceNumber != null,
+                      ),
+                      const SizedBox(height: 12),
+
+                      // PO dropdown (only if no invoice preselected)
+                      if (invoiceNumber == null && selectedVendor != null)
+                        DropdownButtonFormField<int?>(
+                          decoration: const InputDecoration(
+                            labelText: 'Purchase Order (Optional)',
+                            border: OutlineInputBorder(),
+                          ),
+                          isExpanded: true,
+                          initialValue: selectedPOId,
+                          hint: const Text('-- No PO (Direct Payment) --'),
+                          items: [
+                            const DropdownMenuItem<int?>(
+                              value: null,
+                              child: Text('-- No PO (Direct Payment) --'),
+                            ),
+                            ...availablePOs.map((po) {
+                              final poIdValue = _toInt(po['id']);
+                              final total = _toDouble(po['total']);
+                              final paid = _getPaidForPO(poIdValue);
+                              final balance = total - paid;
+                              final invNumber = po['invoice_number'];
+                              String displayText = po['po_number'];
+                              if (invNumber != null &&
+                                  invNumber.toString().isNotEmpty) {
+                                displayText += ' (Inv: $invNumber)';
+                              }
+                              displayText +=
+                                  ' | ₦${_currencyFormat.format(total)} | Bal: ₦${_currencyFormat.format(balance)}';
+                              return DropdownMenuItem<int?>(
+                                value: poIdValue,
+                                child: Text(
+                                  displayText,
+                                  overflow: TextOverflow.ellipsis,
+                                  maxLines: 1,
+                                  style: const TextStyle(fontSize: 12),
+                                ),
+                              );
+                            }),
+                          ],
+                          onChanged: (value) {
+                            setStateDialog(() {
+                              selectedPOId = value;
+                              if (value != null) {
                                 final selectedPO = availablePOs.firstWhere(
-                                  (po) => _toInt(po['id']) == selectedPOId,
+                                  (po) => _toInt(po['id']) == value,
                                   orElse: () => {},
                                 );
                                 if (selectedPO.isNotEmpty) {
-                                  return Container(
+                                  double total = _toDouble(selectedPO['total']);
+                                  double paid = _getPaidForPO(value);
+                                  double balance = total - paid;
+                                  print('=== PO SELECTED DEBUG ===');
+                                  print('PO ID: $value');
+                                  print('Total from PO: $total');
+                                  print('Paid from service: $paid');
+                                  print('Calculated balance: $balance');
+                                  print(
+                                    'Raw total from selectedPO: ${selectedPO['total']}',
+                                  );
+                                  print(
+                                    'Type of total: ${selectedPO['total'].runtimeType}',
+                                  );
+                                  amountController.text = balance.toString();
+                                  if (selectedPO['invoice_number'] != null &&
+                                      selectedPO['invoice_number']
+                                          .toString()
+                                          .isNotEmpty) {
+                                    invoiceNumberController.text =
+                                        selectedPO['invoice_number'];
+                                  }
+                                }
+                              } else {
+                                amountController.clear();
+                              }
+                            });
+                          },
+                        ),
+
+                      if (invoiceNumber == null && selectedVendor != null)
+                        const SizedBox(height: 12),
+
+                      // Amount
+                      TextField(
+                        controller: amountController,
+                        decoration: const InputDecoration(
+                          labelText: 'Amount *',
+                          prefixText: '₦',
+                          border: OutlineInputBorder(),
+                        ),
+                        keyboardType: TextInputType.number,
+                      ),
+                      const SizedBox(height: 12),
+
+                      // Payment Method
+                      Container(
+                        constraints: const BoxConstraints(
+                          maxWidth: double.infinity,
+                        ),
+                        child: DropdownButtonFormField<String>(
+                          decoration: const InputDecoration(
+                            labelText: 'Payment Method *',
+                            border: OutlineInputBorder(),
+                            contentPadding: EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 8,
+                            ),
+                          ),
+                          isExpanded: true,
+                          initialValue: selectedMethod,
+                          items: const [
+                            DropdownMenuItem(
+                              value: 'Cash',
+                              child: Text('Cash'),
+                            ),
+                            DropdownMenuItem(
+                              value: 'Bank Transfer',
+                              child: Text('Bank Transfer'),
+                            ),
+                            DropdownMenuItem(
+                              value: 'Cheque',
+                              child: Text('Cheque'),
+                            ),
+                            DropdownMenuItem(
+                              value: 'Card',
+                              child: Text('Card'),
+                            ),
+                          ],
+                          onChanged: (value) {
+                            setStateDialog(() {
+                              selectedMethod = value!;
+                              selectedBankAccount =
+                                  null; // Reset when method changes
+                            });
+                          },
+                        ),
+                      ),
+
+                      // Bank Account dropdown (only for Bank Transfer or Cheque)
+                      if (selectedMethod == 'Bank Transfer' ||
+                          selectedMethod == 'Cheque')
+                        Column(
+                          children: [
+                            const SizedBox(height: 12),
+                            isLoadingAccounts
+                                ? const Center(
+                                    child: CircularProgressIndicator(),
+                                  )
+                                : bankAccounts.isEmpty
+                                ? Container(
                                     padding: const EdgeInsets.all(12),
                                     decoration: BoxDecoration(
-                                      color: Colors.blue.shade50,
+                                      color: Colors.orange.shade50,
                                       borderRadius: BorderRadius.circular(8),
+                                      border: Border.all(
+                                        color: Colors.orange.shade200,
+                                      ),
                                     ),
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
+                                    child: const Row(
                                       children: [
-                                        Text(
-                                          'PO: ${selectedPO['po_number']}',
-                                          style: const TextStyle(
-                                            fontWeight: FontWeight.bold,
-                                          ),
+                                        Icon(
+                                          Icons.warning,
+                                          color: Colors.orange,
                                         ),
-                                        if (selectedPO['invoice_number'] !=
-                                                null &&
-                                            selectedPO['invoice_number']
-                                                .toString()
-                                                .isNotEmpty)
-                                          Text(
-                                            'Invoice: ${selectedPO['invoice_number']}',
-                                            style: const TextStyle(
-                                              fontSize: 12,
-                                              color: Colors.blue,
-                                            ),
-                                          ),
-                                        const SizedBox(height: 4),
-                                        Text(
-                                          'Balance: ₦${_currencyFormat.format(_toDouble(amountController.text))}',
-                                          style: const TextStyle(
-                                            fontWeight: FontWeight.bold,
+                                        SizedBox(width: 8),
+                                        Expanded(
+                                          child: Text(
+                                            'No bank accounts found. Please add a bank account first.',
+                                            style: TextStyle(fontSize: 12),
                                           ),
                                         ),
                                       ],
                                     ),
-                                  );
-                                }
-                                return const SizedBox.shrink();
-                              },
-                            ),
-                            const SizedBox(height: 12),
-                          ],
-
-                          // Amount
-                          TextField(
-                            controller: amountController,
-                            decoration: const InputDecoration(
-                              labelText: 'Amount *',
-                              prefixText: '₦',
-                              border: OutlineInputBorder(),
-                            ),
-                            keyboardType: TextInputType.number,
-                          ),
-                          const SizedBox(height: 12),
-
-                          // Payment Method
-                          DropdownButtonFormField<String>(
-                            decoration: const InputDecoration(
-                              labelText: 'Payment Method *',
-                              border: OutlineInputBorder(),
-                            ),
-                            value: selectedMethod,
-                            items: const [
-                              DropdownMenuItem(
-                                value: 'Cash',
-                                child: Text('Cash'),
-                              ),
-                              DropdownMenuItem(
-                                value: 'Bank Transfer',
-                                child: Text('Bank Transfer'),
-                              ),
-                              DropdownMenuItem(
-                                value: 'Cheque',
-                                child: Text('Cheque'),
-                              ),
-                              DropdownMenuItem(
-                                value: 'Card',
-                                child: Text('Card'),
-                              ),
-                            ],
-                            onChanged: (value) {
-                              setStateDialog(() {
-                                selectedMethod = value!;
-                              });
-                            },
-                          ),
-                          const SizedBox(height: 12),
-
-                          // Date
-                          InkWell(
-                            onTap: () async {
-                              final date = await showDatePicker(
-                                context: context,
-                                initialDate: selectedDate,
-                                firstDate: DateTime(2020),
-                                lastDate: DateTime.now(),
-                              );
-                              if (date != null) {
-                                setStateDialog(() {
-                                  selectedDate = date;
-                                });
-                              }
-                            },
-                            child: InputDecorator(
-                              decoration: const InputDecoration(
-                                labelText: 'Payment Date',
-                                border: OutlineInputBorder(),
-                              ),
-                              child: Row(
-                                mainAxisAlignment:
-                                    MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Text(_dateFormat.format(selectedDate)),
-                                  const Icon(Icons.calendar_today, size: 20),
-                                ],
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-
-                          // Reference
-                          TextField(
-                            controller: referenceController,
-                            decoration: const InputDecoration(
-                              labelText: 'Reference (Optional)',
-                              border: OutlineInputBorder(),
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-
-                          // Notes
-                          TextField(
-                            controller: notesController,
-                            decoration: const InputDecoration(
-                              labelText: 'Notes (Optional)',
-                              border: OutlineInputBorder(),
-                            ),
-                            maxLines: 2,
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  actions: [
-                    TextButton(
-                      onPressed: () => Navigator.pop(context),
-                      child: const Text('Cancel'),
-                    ),
-                    ElevatedButton(
-                      onPressed: () async {
-                        final vendor = selectedVendor;
-                        if (vendor == null) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Please select a vendor'),
-                            ),
-                          );
-                          return;
-                        }
-
-                        final amount =
-                            double.tryParse(amountController.text) ?? 0;
-                        if (amount <= 0) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Please enter a valid amount'),
-                            ),
-                          );
-                          return;
-                        }
-
-                        if (selectedPOId != null) {
-                          final selectedPO = availablePOs.firstWhere(
-                            (po) => _toInt(po['id']) == selectedPOId,
-                            orElse: () => {},
-                          );
-                          if (selectedPO.isNotEmpty) {
-                            double total = _toDouble(selectedPO['total']);
-                            double paid = 0;
-                            for (var payment in _dialogVendorPayments) {
-                              if (payment.purchaseOrderId == selectedPOId) {
-                                paid += payment.amount;
-                              }
-                            }
-                            double balance = total - paid;
-                            if (amount > balance) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text(
-                                    'Amount exceeds PO balance of ₦${_currencyFormat.format(balance)}',
+                                  )
+                                : DropdownButtonFormField<BankAccount>(
+                                    decoration: const InputDecoration(
+                                      labelText: 'Bank Account *',
+                                      border: OutlineInputBorder(),
+                                    ),
+                                    initialValue: selectedBankAccount,
+                                    isExpanded: true, // ADD THIS
+                                    items: bankAccounts.map((account) {
+                                      return DropdownMenuItem(
+                                        value: account,
+                                        child: SizedBox(
+                                          width:
+                                              380, // ADD THIS - adjust as needed
+                                          child: Text(
+                                            '${account.bankName} - ${account.accountName} (${account.accountNumber ?? 'No account number'})',
+                                            overflow: TextOverflow.ellipsis,
+                                            maxLines: 1,
+                                          ),
+                                        ),
+                                      );
+                                    }).toList(),
+                                    onChanged: (value) {
+                                      setStateDialog(() {
+                                        selectedBankAccount = value;
+                                      });
+                                    },
                                   ),
-                                  backgroundColor: Colors.red,
-                                ),
-                              );
-                              return;
-                            }
+                          ],
+                        ),
+
+                      const SizedBox(height: 12),
+
+                      // Date
+                      InkWell(
+                        onTap: () async {
+                          final date = await showDatePicker(
+                            context: context,
+                            initialDate: selectedDate,
+                            firstDate: DateTime(2020),
+                            lastDate: DateTime.now(),
+                          );
+                          if (date != null) {
+                            setStateDialog(() {
+                              selectedDate = date;
+                            });
                           }
-                        }
-
-                        await _paymentService.addPayment(
-                          vendorId: vendor.id,
-                          purchaseOrderId: selectedPOId,
-                          paymentDate: selectedDate,
-                          amount: amount,
-                          paymentMethod: selectedMethod,
-                          reference: referenceController.text.isNotEmpty
-                              ? referenceController.text
-                              : null,
-                          notes: notesController.text.isNotEmpty
-                              ? notesController.text
-                              : null,
-                          createdBy: 1,
-                        );
-
-                        Navigator.pop(context);
-
-                        final currentSelectedVendor = _selectedVendor;
-                        if (currentSelectedVendor != null &&
-                            vendor.id == currentSelectedVendor.id) {
-                          await _loadVendorDetails(currentSelectedVendor);
-                        }
-                        _loadData();
-
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Payment recorded successfully'),
-                            backgroundColor: Colors.green,
+                        },
+                        child: InputDecorator(
+                          decoration: const InputDecoration(
+                            labelText: 'Payment Date',
+                            border: OutlineInputBorder(),
                           ),
-                        );
-                      },
-                      child: const Text('Save'),
-                    ),
-                  ],
-                );
-              },
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(_dateFormat.format(selectedDate)),
+                              const Icon(Icons.calendar_today, size: 20),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+
+                      // Reference
+                      TextField(
+                        controller: referenceController,
+                        decoration: const InputDecoration(
+                          labelText: 'Reference (Optional)',
+                          border: OutlineInputBorder(),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+
+                      // Notes
+                      TextField(
+                        controller: notesController,
+                        decoration: const InputDecoration(
+                          labelText: 'Notes (Optional)',
+                          border: OutlineInputBorder(),
+                        ),
+                        maxLines: 2,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Cancel'),
+                ),
+                ElevatedButton(
+                  onPressed: () async {
+                    final vendor = selectedVendor;
+                    if (vendor == null) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Please select a vendor')),
+                      );
+                      return;
+                    }
+
+                    final amount = double.tryParse(amountController.text) ?? 0;
+                    if (amount <= 0) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Please enter a valid amount'),
+                        ),
+                      );
+                      return;
+                    }
+
+                    final invoiceNum = invoiceNumberController.text;
+                    if (invoiceNum.isEmpty) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Please enter invoice number'),
+                        ),
+                      );
+                      return;
+                    }
+
+                    // Validate bank account is selected when needed
+                    if ((selectedMethod == 'Bank Transfer' ||
+                            selectedMethod == 'Cheque') &&
+                        selectedBankAccount == null) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Please select a bank account'),
+                        ),
+                      );
+                      return;
+                    }
+
+                    // Check if amount exceeds invoice balance
+                    if (invoiceTotal != null && amount > invoiceTotal) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(
+                            'Payment amount (₦${_currencyFormat.format(amount)}) exceeds invoice balance of ₦${_currencyFormat.format(invoiceTotal)}',
+                          ),
+                          backgroundColor: Colors.red,
+                        ),
+                      );
+                      return;
+                    }
+
+                    final paymentPoId = selectedPOId ?? poId;
+
+                    print('=== PAYMENT DEBUG ===');
+                    print('Vendor: ${vendor.name}');
+                    print('PO ID: $paymentPoId');
+                    print('Amount: $amount');
+                    print('Invoice: $invoiceNum');
+                    print('Payment Method: $selectedMethod');
+                    print('Bank Account: ${selectedBankAccount?.accountName}');
+
+                    await _paymentService.addPayment(
+                      vendorId: vendor.id,
+                      purchaseOrderId: paymentPoId,
+                      paymentDate: selectedDate,
+                      amount: amount,
+                      paymentMethod: selectedMethod,
+                      reference: referenceController.text.isNotEmpty
+                          ? referenceController.text
+                          : null,
+                      notes: notesController.text.isNotEmpty
+                          ? notesController.text
+                          : null,
+                      createdBy: 1,
+                      bankAccountId: selectedBankAccount?.id,
+                    );
+
+                    Navigator.pop(context);
+                    _loadData();
+
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          'Payment recorded for ${invoiceNum.isNotEmpty ? 'invoice $invoiceNum' : 'PO'}',
+                        ),
+                        backgroundColor: Colors.green,
+                      ),
+                    );
+                  },
+                  child: const Text('Save'),
+                ),
+              ],
             );
           },
         );
@@ -589,7 +736,7 @@ class _VendorPaymentScreenState extends State<VendorPaymentScreen> {
 
   void _showVendorDetails(VendorPaymentSummary summary) async {
     final vendor = _vendors.firstWhere((v) => v.id == summary.vendorId);
-    await _loadVendorDetails(vendor);
+    final invoices = await _getVendorInvoices(vendor.id);
 
     showModalBottomSheet(
       context: context,
@@ -623,7 +770,7 @@ class _VendorPaymentScreenState extends State<VendorPaymentScreen> {
                       ),
                       const SizedBox(height: 16),
                       Text(
-                        summary.vendorName,
+                        vendor.name,
                         style: const TextStyle(
                           fontSize: 20,
                           fontWeight: FontWeight.bold,
@@ -662,268 +809,170 @@ class _VendorPaymentScreenState extends State<VendorPaymentScreen> {
                       const Divider(height: 24),
 
                       const Text(
-                        'Outstanding Purchase Orders',
+                        'Outstanding Invoices',
                         style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
                       const SizedBox(height: 8),
-                      Container(
-                        constraints: BoxConstraints(
-                          maxHeight: MediaQuery.of(context).size.height * 0.25,
-                        ),
-                        child: _vendorPOs.isEmpty
-                            ? const Center(child: Text('No outstanding POs'))
+                      Expanded(
+                        child: invoices.isEmpty
+                            ? const Center(
+                                child: Text('No outstanding invoices'),
+                              )
                             : ListView.builder(
-                                shrinkWrap: true,
-                                itemCount: _vendorPOs.length,
+                                controller: scrollController,
+                                itemCount: invoices.length,
                                 itemBuilder: (context, index) {
-                                  final po = _vendorPOs[index];
-                                  final poId = _toInt(po['id']);
-                                  final paid = _getPaidForPO(poId);
-                                  final total = _toDouble(po['total']);
-                                  final balance = total - paid;
-                                  final invoiceNumber = po['invoice_number'];
-
-                                  if (balance <= 0)
+                                  final invoice = invoices[index];
+                                  if (invoice.balance <= 0) {
                                     return const SizedBox.shrink();
+                                  }
 
                                   return Card(
                                     margin: const EdgeInsets.only(bottom: 8),
-                                    child: ListTile(
+                                    child: ExpansionTile(
+                                      leading: CircleAvatar(
+                                        backgroundColor: Colors.orange.shade100,
+                                        child: const Icon(
+                                          Icons.receipt,
+                                          color: Colors.orange,
+                                          size: 20,
+                                        ),
+                                      ),
                                       title: Text(
-                                        po['po_number'],
+                                        '📄 ${invoice.invoiceNumber}',
                                         style: const TextStyle(
                                           fontWeight: FontWeight.bold,
+                                          fontSize: 14,
                                         ),
+                                        overflow: TextOverflow.ellipsis,
                                       ),
                                       subtitle: Column(
                                         crossAxisAlignment:
                                             CrossAxisAlignment.start,
                                         children: [
-                                          if (invoiceNumber != null &&
-                                              invoiceNumber
-                                                  .toString()
-                                                  .isNotEmpty)
-                                            Text(
-                                              'Invoice: $invoiceNumber',
-                                              style: const TextStyle(
-                                                fontSize: 11,
-                                                color: Colors.blue,
-                                              ),
-                                            ),
                                           Text(
-                                            'Date: ${_dateFormat.format(DateTime.parse(po['order_date']))}',
-                                          ),
-                                          Text(
-                                            'Total: ₦${_currencyFormat.format(total)}',
-                                          ),
-                                          Text(
-                                            'Paid: ₦${_currencyFormat.format(paid)}',
-                                          ),
-                                        ],
-                                      ),
-                                      trailing: Column(
-                                        mainAxisAlignment:
-                                            MainAxisAlignment.center,
-                                        children: [
-                                          Text(
-                                            'Balance: ₦${_currencyFormat.format(balance)}',
+                                            'Date: ${_dateFormat.format(invoice.invoiceDate)}',
                                             style: const TextStyle(
+                                              fontSize: 11,
+                                            ),
+                                          ),
+                                          Text(
+                                            'Balance: ₦${_currencyFormat.format(invoice.balance)}',
+                                            style: TextStyle(
+                                              fontSize: 12,
                                               fontWeight: FontWeight.bold,
                                               color: Colors.orange,
                                             ),
                                           ),
-                                          const SizedBox(height: 4),
-                                          ElevatedButton(
-                                            onPressed: () {
-                                              Navigator.pop(context);
-                                              _showAddPaymentDialog(poId: poId);
-                                            },
-                                            style: ElevatedButton.styleFrom(
-                                              backgroundColor: Colors.green,
-                                              minimumSize: const Size(80, 30),
-                                              padding:
-                                                  const EdgeInsets.symmetric(
-                                                    horizontal: 8,
+                                        ],
+                                      ),
+                                      children: [
+                                        Padding(
+                                          padding: const EdgeInsets.all(12),
+                                          child: Column(
+                                            children: [
+                                              const Text(
+                                                'Purchase Orders',
+                                                style: TextStyle(
+                                                  fontSize: 12,
+                                                  fontWeight: FontWeight.bold,
+                                                ),
+                                              ),
+                                              const SizedBox(height: 8),
+                                              ...invoice.purchaseOrders.map(
+                                                (po) => Container(
+                                                  padding:
+                                                      const EdgeInsets.symmetric(
+                                                        vertical: 4,
+                                                      ),
+                                                  child: Row(
+                                                    mainAxisAlignment:
+                                                        MainAxisAlignment
+                                                            .spaceBetween,
+                                                    children: [
+                                                      Expanded(
+                                                        child: Text(
+                                                          po.poNumber,
+                                                          style:
+                                                              const TextStyle(
+                                                                fontSize: 12,
+                                                              ),
+                                                          overflow: TextOverflow
+                                                              .ellipsis,
+                                                        ),
+                                                      ),
+                                                      Text(
+                                                        '₦${_currencyFormat.format(po.balance)}',
+                                                        style: const TextStyle(
+                                                          fontSize: 12,
+                                                        ),
+                                                      ),
+                                                    ],
                                                   ),
-                                            ),
-                                            child: const Text(
-                                              'Pay',
-                                              style: TextStyle(fontSize: 12),
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  );
-                                },
-                              ),
-                      ),
-
-                      const Divider(height: 24),
-
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          const Text(
-                            'Payment History',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          ElevatedButton.icon(
-                            onPressed: () {
-                              Navigator.pop(context);
-                              _showAddPaymentDialog();
-                            },
-                            icon: const Icon(Icons.add, size: 18),
-                            label: const Text('Record Payment'),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.green,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      Expanded(
-                        child: _selectedVendorPayments.isEmpty
-                            ? const Center(child: Text('No payments recorded'))
-                            : ListView.builder(
-                                controller: scrollController,
-                                itemCount: _selectedVendorPayments.length,
-                                itemBuilder: (context, index) {
-                                  final payment =
-                                      _selectedVendorPayments[index];
-                                  final po = _vendorPOs.firstWhere(
-                                    (p) =>
-                                        _toInt(p['id']) ==
-                                        payment.purchaseOrderId,
-                                    orElse: () => {
-                                      'po_number': 'N/A',
-                                      'invoice_number': null,
-                                    },
-                                  );
-                                  final invoiceNumber = po['invoice_number'];
-
-                                  return Card(
-                                    margin: const EdgeInsets.only(bottom: 8),
-                                    child: ListTile(
-                                      leading: CircleAvatar(
-                                        backgroundColor: Colors.green.shade100,
-                                        child: const Icon(
-                                          Icons.payment,
-                                          color: Colors.green,
-                                          size: 20,
-                                        ),
-                                      ),
-                                      title: Text(
-                                        '₦${_currencyFormat.format(payment.amount)}',
-                                        style: const TextStyle(
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                      subtitle: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            '${payment.paymentMethod} • ${_dateFormat.format(payment.paymentDate)}',
-                                          ),
-                                          if (payment.purchaseOrderId !=
-                                              null) ...[
-                                            Text(
-                                              'PO: ${po['po_number']}',
-                                              style: const TextStyle(
-                                                fontSize: 11,
-                                              ),
-                                            ),
-                                            if (invoiceNumber != null &&
-                                                invoiceNumber
-                                                    .toString()
-                                                    .isNotEmpty)
-                                              Text(
-                                                'Invoice: $invoiceNumber',
-                                                style: const TextStyle(
-                                                  fontSize: 11,
-                                                  color: Colors.blue,
                                                 ),
                                               ),
-                                          ],
-                                          if (payment.reference != null)
-                                            Text(
-                                              'Ref: ${payment.reference}',
-                                              style: const TextStyle(
-                                                fontSize: 11,
+                                              const Divider(),
+                                              Row(
+                                                mainAxisAlignment:
+                                                    MainAxisAlignment
+                                                        .spaceBetween,
+                                                children: [
+                                                  const Text(
+                                                    'Total Balance:',
+                                                    style: TextStyle(
+                                                      fontSize: 13,
+                                                      fontWeight:
+                                                          FontWeight.bold,
+                                                    ),
+                                                  ),
+                                                  Text(
+                                                    '₦${_currencyFormat.format(invoice.balance)}',
+                                                    style: const TextStyle(
+                                                      fontSize: 13,
+                                                      fontWeight:
+                                                          FontWeight.bold,
+                                                      color: Colors.orange,
+                                                    ),
+                                                  ),
+                                                ],
                                               ),
-                                            ),
-                                        ],
-                                      ),
-                                      trailing: IconButton(
-                                        icon: const Icon(
-                                          Icons.delete,
-                                          color: Colors.red,
-                                          size: 20,
-                                        ),
-                                        onPressed: () async {
-                                          final confirm = await showDialog<bool>(
-                                            context: context,
-                                            builder: (context) => AlertDialog(
-                                              title: const Text(
-                                                'Delete Payment',
-                                              ),
-                                              content: Text(
-                                                'Delete payment of ₦${_currencyFormat.format(payment.amount)} to ${summary.vendorName}?',
-                                              ),
-                                              actions: [
-                                                TextButton(
-                                                  onPressed: () =>
-                                                      Navigator.pop(
-                                                        context,
-                                                        false,
-                                                      ),
-                                                  child: const Text('Cancel'),
-                                                ),
-                                                ElevatedButton(
-                                                  onPressed: () =>
-                                                      Navigator.pop(
-                                                        context,
-                                                        true,
-                                                      ),
+                                              const SizedBox(height: 12),
+                                              // In the fallback invoice card, when creating the invoice, store the PO ID
+                                              // Update the button onPressed to pass both invoice number and poId
+                                              SizedBox(
+                                                width: double.infinity,
+                                                child: ElevatedButton(
+                                                  onPressed: () {
+                                                    Navigator.pop(context);
+                                                    _showAddPaymentDialog(
+                                                      invoiceNumber: invoice
+                                                          .invoiceNumber, // PO number
+                                                      poId: invoice
+                                                          .purchaseOrders
+                                                          .first
+                                                          .id, // Pass the actual PO ID
+                                                      vendor: vendor,
+                                                      invoiceTotal:
+                                                          invoice.balance,
+                                                    );
+                                                  },
                                                   style:
                                                       ElevatedButton.styleFrom(
                                                         backgroundColor:
-                                                            Colors.red,
+                                                            Colors.green,
                                                       ),
-                                                  child: const Text('Delete'),
+                                                  child: const Text(
+                                                    'Pay This Invoice',
+                                                  ),
                                                 ),
-                                              ],
-                                            ),
-                                          );
-                                          if (confirm == true) {
-                                            await _paymentService.deletePayment(
-                                              payment.id!,
-                                            );
-                                            await _loadVendorDetails(
-                                              _selectedVendor!,
-                                            );
-                                            _loadData();
-                                            setStateSheet(() {});
-                                            ScaffoldMessenger.of(
-                                              context,
-                                            ).showSnackBar(
-                                              const SnackBar(
-                                                content: Text(
-                                                  'Payment deleted',
-                                                ),
-                                                backgroundColor: Colors.red,
                                               ),
-                                            );
-                                          }
-                                        },
-                                      ),
+                                            ],
+                                          ),
+                                        ),
+                                      ],
                                     ),
                                   );
                                 },
@@ -944,9 +993,9 @@ class _VendorPaymentScreenState extends State<VendorPaymentScreen> {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: color.withOpacity(0.3)),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1084,7 +1133,7 @@ class _VendorPaymentScreenState extends State<VendorPaymentScreen> {
                                   vertical: 2,
                                 ),
                                 decoration: BoxDecoration(
-                                  color: balanceColor.withOpacity(0.2),
+                                  color: balanceColor.withValues(alpha: 0.2),
                                   borderRadius: BorderRadius.circular(10),
                                 ),
                                 child: Text(

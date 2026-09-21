@@ -1,5 +1,5 @@
-import 'package:pos_system/models/stock_report.dart';
-import 'package:pos_system/services/product_service.dart';
+import 'package:zite_web_pos/models/stock_report.dart';
+import 'package:zite_web_pos/services/product_service.dart';
 
 class StockReportService {
   final ProductService _productService = ProductService();

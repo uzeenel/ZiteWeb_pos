@@ -8,6 +8,7 @@ class Customer {
   final String? stateName;
   final String? taxId;
   final double creditLimit;
+  final double currentBalance; // Add this field
   final int creditDays;
   final bool isActive;
   final DateTime createdAt;
@@ -23,6 +24,7 @@ class Customer {
     this.stateName,
     this.taxId,
     this.creditLimit = 0,
+    this.currentBalance = 0, // Add this
     this.creditDays = 0,
     this.isActive = true,
     required this.createdAt,
@@ -30,8 +32,7 @@ class Customer {
   });
 
   factory Customer.fromMap(Map<String, dynamic> map) {
-    // Helper function to safely convert to double
-    double _toDouble(dynamic value) {
+    double toDouble(dynamic value) {
       if (value == null) return 0.0;
       if (value is double) return value;
       if (value is int) return value.toDouble();
@@ -39,8 +40,7 @@ class Customer {
       return 0.0;
     }
 
-    // Helper function to safely convert to int
-    int _toInt(dynamic value) {
+    int toInt(dynamic value) {
       if (value == null) return 0;
       if (value is int) return value;
       if (value is double) return value.toInt();
@@ -49,16 +49,17 @@ class Customer {
     }
 
     return Customer(
-      id: _toInt(map['id']),
+      id: toInt(map['id']),
       name: map['name'] ?? '',
       phone: map['phone'],
       email: map['email'],
       address: map['address'],
-      stateId: map['state_id'] != null ? _toInt(map['state_id']) : null,
+      stateId: map['state_id'] != null ? toInt(map['state_id']) : null,
       stateName: map['state_name'],
       taxId: map['tax_id'],
-      creditLimit: _toDouble(map['credit_limit']),
-      creditDays: _toInt(map['credit_days']),
+      creditLimit: toDouble(map['credit_limit']),
+      currentBalance: toDouble(map['current_balance'] ?? 0), // Add this
+      creditDays: toInt(map['credit_days']),
       isActive: map['is_active'] == 1,
       createdAt: DateTime.parse(map['created_at']),
       updatedAt: map['updated_at'] != null
@@ -77,6 +78,7 @@ class Customer {
       'state_id': stateId,
       'tax_id': taxId,
       'credit_limit': creditLimit,
+      'current_balance': currentBalance, // Add this
       'credit_days': creditDays,
       'is_active': isActive ? 1 : 0,
     };

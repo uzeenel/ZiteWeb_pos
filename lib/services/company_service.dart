@@ -1,6 +1,7 @@
-import 'package:pos_system/models/company.dart';
-import 'package:pos_system/models/region.dart';
-import 'package:pos_system/services/api_service.dart';
+import 'dart:io';
+import 'package:zite_web_pos/models/company.dart';
+import 'package:zite_web_pos/models/region.dart';
+import 'package:zite_web_pos/services/api_service.dart';
 
 class CompanyService {
   // Get company settings
@@ -29,7 +30,7 @@ class CompanyService {
   }
 
   // Save or update company settings
-  Future<int> saveCompany({
+    Future<int> saveCompany({
     required String name,
     String? address,
     String? phone,
@@ -38,6 +39,10 @@ class CompanyService {
     int? stateId,
     bool? autoCashBook,
     bool? autoBankBook,
+    double? defaultMarkupPercent,
+    bool? vatEnabled,
+    double? vatRate,
+    File? logoFile,
   }) async {
     try {
       final companyData = {
@@ -49,7 +54,15 @@ class CompanyService {
         'stateId': stateId,
         'autoCashBook': autoCashBook ?? true,
         'autoBankBook': autoBankBook ?? true,
+        'defaultMarkupPercent': defaultMarkupPercent ?? 0,
+        'vatEnabled': vatEnabled ?? true,
+        'vatRate': vatRate ?? 7.5,
       };
+
+      // Upload logo if provided
+      if (logoFile != null) {
+        await ApiService.uploadCompanyLogo(logoFile);
+      }
 
       final result = await ApiService.saveCompany(companyData);
       return result['id'] as int;

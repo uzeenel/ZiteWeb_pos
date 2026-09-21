@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:pos_system/models/expense.dart';
-import 'package:pos_system/services/expense_service.dart';
-import 'package:pos_system/screens/unauthorized_screen.dart';
-import 'package:pos_system/utils/permissions.dart';
+import 'package:zite_web_pos/models/expense.dart';
+import 'package:zite_web_pos/services/expense_service.dart';
+import 'package:zite_web_pos/screens/unauthorized_screen.dart';
+import 'package:zite_web_pos/utils/permissions.dart';
+import 'package:zite_web_pos/models/bank_account.dart';
+import 'package:zite_web_pos/services/bank_service.dart';
 
 class ExpensesScreen extends StatefulWidget {
   const ExpensesScreen({super.key});
@@ -46,6 +48,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
     ExpenseCategory.security: '🔒',
     ExpenseCategory.internet: '🌐',
     ExpenseCategory.phone: '📱',
+    ExpenseCategory.electricity: '💡',
     ExpenseCategory.bank_charges: '🏦',
     ExpenseCategory.subscriptions: '📰',
     ExpenseCategory.refunds: '↩️',
@@ -81,6 +84,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
     ExpenseCategory.security: Colors.indigoAccent,
     ExpenseCategory.internet: Colors.blueAccent,
     ExpenseCategory.phone: Colors.greenAccent,
+    ExpenseCategory.electricity: Colors.yellowAccent,
     ExpenseCategory.bank_charges: Colors.redAccent,
     ExpenseCategory.subscriptions: Colors.purpleAccent,
     ExpenseCategory.refunds: Colors.pinkAccent,
@@ -127,74 +131,192 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
     final TextEditingController referenceController = TextEditingController();
     final TextEditingController vendorController = TextEditingController();
     ExpenseCategory selectedCategory = ExpenseCategory.other;
+    String selectedPaymentMethod = 'cash';
+    BankAccount? selectedBankAccount;
+    List<BankAccount> bankAccounts = [];
+
+    // Load bank accounts first
+    try {
+      bankAccounts = await BankService.getBankAccounts();
+    } catch (e) {
+      print('Error loading bank accounts: $e');
+    }
 
     await showDialog(
       context: context,
       builder: (context) {
         return StatefulBuilder(
           builder: (context, setState) {
+            final showBankFields = selectedPaymentMethod != 'cash';
+            final availableBankAccounts = bankAccounts
+                .where((a) => a.isActive)
+                .toList();
+
             return AlertDialog(
               title: const Text('Add Expense'),
               content: SizedBox(
-                width: 300,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    TextField(
-                      controller: amountController,
-                      decoration: const InputDecoration(
-                        labelText: 'Amount',
-                        prefixText: '₦',
-                        border: OutlineInputBorder(),
+                width: 350,
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      TextField(
+                        controller: amountController,
+                        decoration: const InputDecoration(
+                          labelText: 'Amount',
+                          prefixText: '₦',
+                          border: OutlineInputBorder(),
+                        ),
+                        keyboardType: TextInputType.number,
                       ),
-                      keyboardType: TextInputType.number,
-                    ),
-                    const SizedBox(height: 12),
-                    DropdownButtonFormField<ExpenseCategory>(
-                      value: selectedCategory,
-                      decoration: const InputDecoration(
-                        labelText: 'Category',
-                        border: OutlineInputBorder(),
+                      const SizedBox(height: 12),
+                      DropdownButtonFormField<ExpenseCategory>(
+                        initialValue: selectedCategory,
+                        decoration: const InputDecoration(
+                          labelText: 'Category',
+                          border: OutlineInputBorder(),
+                        ),
+                        items: ExpenseCategory.values.map((category) {
+                          return DropdownMenuItem(
+                            value: category,
+                            child: Text(
+                              '${_categoryIcons[category]} ${_categoryName(category)}',
+                            ),
+                          );
+                        }).toList(),
+                        onChanged: (value) {
+                          if (value != null) {
+                            setState(() => selectedCategory = value);
+                          }
+                        },
                       ),
-                      items: ExpenseCategory.values.map((category) {
-                        return DropdownMenuItem(
-                          value: category,
-                          child: Text(
-                            '${_categoryIcons[category]} ${_categoryName(category)}',
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: descriptionController,
+                        decoration: const InputDecoration(
+                          labelText: 'Description',
+                          border: OutlineInputBorder(),
+                        ),
+                        maxLines: 2,
+                      ),
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: vendorController,
+                        decoration: const InputDecoration(
+                          labelText: 'Vendor (Optional)',
+                          border: OutlineInputBorder(),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      DropdownButtonFormField<String>(
+                        initialValue: selectedPaymentMethod,
+                        decoration: const InputDecoration(
+                          labelText: 'Payment Method',
+                          border: OutlineInputBorder(),
+                        ),
+                        items: const [
+                          DropdownMenuItem(value: 'cash', child: Text('Cash')),
+                          DropdownMenuItem(value: 'card', child: Text('Card')),
+                          DropdownMenuItem(
+                            value: 'transfer',
+                            child: Text('Transfer'),
                           ),
-                        );
-                      }).toList(),
-                      onChanged: (value) {
-                        if (value != null)
-                          setState(() => selectedCategory = value);
-                      },
-                    ),
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: descriptionController,
-                      decoration: const InputDecoration(
-                        labelText: 'Description',
-                        border: OutlineInputBorder(),
+                          DropdownMenuItem(
+                            value: 'bank',
+                            child: Text('Bank Transfer'),
+                          ),
+                        ],
+                        onChanged: (value) {
+                          if (value != null) {
+                            setState(() {
+                              selectedPaymentMethod = value;
+                              selectedBankAccount = null;
+                            });
+                          }
+                        },
                       ),
-                      maxLines: 2,
-                    ),
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: vendorController,
-                      decoration: const InputDecoration(
-                        labelText: 'Vendor (Optional)',
-                        border: OutlineInputBorder(),
+                      if (showBankFields &&
+                          availableBankAccounts.isNotEmpty) ...[
+                        const SizedBox(height: 12),
+                        Container(
+                          constraints: const BoxConstraints(maxWidth: 300),
+                          child: DropdownButtonFormField<BankAccount>(
+                            initialValue: selectedBankAccount,
+                            decoration: const InputDecoration(
+                              labelText: 'Select Bank Account *',
+                              border: OutlineInputBorder(),
+                              contentPadding: EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 8,
+                              ),
+                            ),
+                            isExpanded: true,
+                            items: availableBankAccounts.map((account) {
+                              return DropdownMenuItem(
+                                value: account,
+                                child: SizedBox(
+                                  width: 260,
+                                  child: Text(
+                                    '${account.accountName} - ${account.bankName}',
+                                    overflow: TextOverflow.ellipsis,
+                                    maxLines: 1,
+                                  ),
+                                ),
+                              );
+                            }).toList(),
+                            onChanged: (value) {
+                              if (value != null) {
+                                setState(() => selectedBankAccount = value);
+                              }
+                            },
+                          ),
+                        ),
+                      ],
+                      if (showBankFields &&
+                          availableBankAccounts.isNotEmpty) ...[
+                        const SizedBox(height: 12),
+                        Container(
+                          constraints: const BoxConstraints(maxWidth: 300),
+                          child: DropdownButtonFormField<BankAccount>(
+                            initialValue: selectedBankAccount,
+                            decoration: const InputDecoration(
+                              labelText: 'Select Bank Account *',
+                              border: OutlineInputBorder(),
+                            ),
+                            isExpanded: true,
+                            items: availableBankAccounts.map((account) {
+                              return DropdownMenuItem(
+                                value: account,
+                                child: Container(
+                                  constraints: const BoxConstraints(
+                                    maxWidth: 280,
+                                  ),
+                                  child: Text(
+                                    '${account.accountName} - ${account.bankName}',
+                                    overflow: TextOverflow.ellipsis,
+                                    maxLines: 1,
+                                  ),
+                                ),
+                              );
+                            }).toList(),
+                            onChanged: (value) {
+                              if (value != null) {
+                                setState(() => selectedBankAccount = value);
+                              }
+                            },
+                          ),
+                        ),
+                      ],
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: referenceController,
+                        decoration: const InputDecoration(
+                          labelText: 'Reference (Optional)',
+                          border: OutlineInputBorder(),
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: referenceController,
-                      decoration: const InputDecoration(
-                        labelText: 'Reference (Optional)',
-                        border: OutlineInputBorder(),
-                      ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
               actions: [
@@ -222,6 +344,19 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                       return;
                     }
 
+                    // Validate bank account selection for non-cash payments
+                    if (selectedPaymentMethod != 'cash') {
+                      if (selectedBankAccount == null &&
+                          availableBankAccounts.isNotEmpty) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Please select a bank account'),
+                          ),
+                        );
+                        return;
+                      }
+                    }
+
                     final expense = Expense(
                       date: _selectedDate,
                       category: selectedCategory,
@@ -233,6 +368,8 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                       vendor: vendorController.text.isNotEmpty
                           ? vendorController.text
                           : null,
+                      paymentMethod: selectedPaymentMethod,
+                      bankAccountId: selectedBankAccount?.id,
                       createdAt: DateTime.now(),
                     );
 
@@ -469,7 +606,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                                   width: 40,
                                   height: 40,
                                   decoration: BoxDecoration(
-                                    color: color.withOpacity(0.1),
+                                    color: color.withValues(alpha: 0.1),
                                     shape: BoxShape.circle,
                                   ),
                                   child: Center(
@@ -530,9 +667,9 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: color.withOpacity(0.3)),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

@@ -1,4 +1,4 @@
-import 'package:pos_system/models/product.dart';
+import 'package:zite_web_pos/models/product.dart';
 
 class StockReport {
   final String productName;

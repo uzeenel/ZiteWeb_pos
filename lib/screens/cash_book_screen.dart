@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:pos_system/models/cash_book.dart';
-import 'package:pos_system/services/cash_book_service.dart';
-import 'package:pos_system/services/export_service.dart' as expService;
-import 'package:pos_system/screens/unauthorized_screen.dart';
-import 'package:pos_system/utils/permissions.dart';
+import 'package:zite_web_pos/models/cash_book.dart';
+import 'package:zite_web_pos/services/cash_book_service.dart';
+import 'package:zite_web_pos/services/export_service.dart' as expService;
+import 'package:zite_web_pos/screens/unauthorized_screen.dart';
+import 'package:zite_web_pos/utils/permissions.dart';
 
 class CashBookScreen extends StatefulWidget {
   const CashBookScreen({super.key});
@@ -18,7 +18,7 @@ class _CashBookScreenState extends State<CashBookScreen> {
   final expService.ExportService _exportService = expService.ExportService();
   List<CashTransaction> _transactions = [];
   DateTime _selectedDate = DateTime.now();
-  double _openingBalance = 0;
+  final double _openingBalance = 0;
   CashSummary? _summary;
   bool _isLoading = true;
   bool _isExporting = false;
@@ -77,7 +77,7 @@ class _CashBookScreenState extends State<CashBookScreen> {
     });
   }
 
-  Future<void> _exportToExcel() async {
+    Future<void> _exportToExcel() async {
     if (_transactions.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -90,30 +90,25 @@ class _CashBookScreenState extends State<CashBookScreen> {
 
     setState(() => _isExporting = true);
     try {
-      final file = await _exportService.exportCashBookToExcel(
+      await _exportService.exportCashBookToExcel(
         _transactions,
         _summary!,
         _selectedDate,
       );
-      if (file != null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('File saved: ${file.path.split('/').last}'),
-            backgroundColor: Colors.green,
-          ),
-        );
-      } else {
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Save cancelled'),
-            backgroundColor: Colors.orange,
+            content: Text('Excel file downloaded'),
+            backgroundColor: Colors.green,
           ),
         );
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+        );
+      }
     } finally {
       if (mounted) setState(() => _isExporting = false);
     }
@@ -132,35 +127,31 @@ class _CashBookScreenState extends State<CashBookScreen> {
 
     setState(() => _isExporting = true);
     try {
-      final file = await _exportService.exportCashBookToPdf(
+      await _exportService.exportCashBookToPdf(
         _transactions,
         _summary!,
         _selectedDate,
       );
-      if (file != null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('File saved: ${file.path.split('/').last}'),
-            backgroundColor: Colors.green,
-          ),
-        );
-      } else {
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Save cancelled'),
-            backgroundColor: Colors.orange,
+            content: Text('PDF file downloaded'),
+            backgroundColor: Colors.green,
           ),
         );
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+        );
+      }
     } finally {
       if (mounted) setState(() => _isExporting = false);
     }
   }
 
+  
   Future<void> _addTransaction({required bool isCashIn}) async {
     final TextEditingController amountController = TextEditingController();
     final TextEditingController descriptionController = TextEditingController();
@@ -190,7 +181,7 @@ class _CashBookScreenState extends State<CashBookScreen> {
                     ),
                     const SizedBox(height: 12),
                     DropdownButtonFormField<String>(
-                      value: selectedCategory,
+                      initialValue: selectedCategory,
                       decoration: const InputDecoration(
                         labelText: 'Category',
                         border: OutlineInputBorder(),
@@ -202,8 +193,9 @@ class _CashBookScreenState extends State<CashBookScreen> {
                         );
                       }).toList(),
                       onChanged: (value) {
-                        if (value != null)
+                        if (value != null) {
                           setState(() => selectedCategory = value);
+                        }
                       },
                     ),
                     const SizedBox(height: 12),
@@ -535,7 +527,7 @@ class _CashBookScreenState extends State<CashBookScreen> {
                                             (isCashIn
                                                     ? Colors.green
                                                     : Colors.red)
-                                                .withOpacity(0.1),
+                                                .withValues(alpha: 0.1),
                                         shape: BoxShape.circle,
                                       ),
                                       child: Icon(
@@ -622,9 +614,9 @@ class _CashBookScreenState extends State<CashBookScreen> {
     return Container(
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: color.withOpacity(0.3)),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

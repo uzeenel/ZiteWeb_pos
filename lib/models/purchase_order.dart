@@ -27,7 +27,7 @@ class PurchaseOrder {
 
   factory PurchaseOrder.fromMap(Map<String, dynamic> map) {
     // Helper to safely convert to double
-    double _toDouble(dynamic value) {
+    double toDouble(dynamic value) {
       if (value == null) return 0.0;
       if (value is double) return value;
       if (value is int) return value.toDouble();
@@ -36,7 +36,7 @@ class PurchaseOrder {
     }
 
     // Helper to safely convert to int
-    int _toInt(dynamic value) {
+    int toInt(dynamic value) {
       if (value == null) return 0;
       if (value is int) return value;
       if (value is double) return value.toInt();
@@ -45,26 +45,26 @@ class PurchaseOrder {
     }
 
     // Helper to safely convert to DateTime
-    DateTime _toDateTime(dynamic value) {
+    DateTime toDateTime(dynamic value) {
       if (value == null) return DateTime.now();
       if (value is DateTime) return value;
       return DateTime.parse(value.toString());
     }
 
     return PurchaseOrder(
-      id: _toInt(map['id']),
+      id: toInt(map['id']),
       poNumber: map['po_number']?.toString() ?? '',
-      vendorId: _toInt(map['vendor_id']),
-      orderDate: _toDateTime(map['order_date']),
+      vendorId: toInt(map['vendor_id']),
+      orderDate: toDateTime(map['order_date']),
       expectedDelivery: map['expected_delivery'] != null
-          ? _toDateTime(map['expected_delivery'])
+          ? toDateTime(map['expected_delivery'])
           : null,
-      subtotal: _toDouble(map['subtotal']),
-      tax: _toDouble(map['tax']),
-      total: _toDouble(map['total']),
+      subtotal: toDouble(map['subtotal']),
+      tax: toDouble(map['tax']),
+      total: toDouble(map['total']),
       status: map['status']?.toString() ?? 'pending',
       notes: map['notes']?.toString(),
-      createdAt: _toDateTime(map['created_at']),
+      createdAt: toDateTime(map['created_at']),
     );
   }
 
@@ -107,7 +107,7 @@ class PurchaseOrderItem {
   });
 
   factory PurchaseOrderItem.fromMap(Map<String, dynamic> map) {
-    double _toDouble(dynamic value) {
+    double toDouble(dynamic value) {
       if (value == null) return 0.0;
       if (value is double) return value;
       if (value is int) return value.toDouble();
@@ -115,7 +115,7 @@ class PurchaseOrderItem {
       return 0.0;
     }
 
-    int _toInt(dynamic value) {
+    int toInt(dynamic value) {
       if (value == null) return 0;
       if (value is int) return value;
       if (value is double) return value.toInt();
@@ -124,14 +124,14 @@ class PurchaseOrderItem {
     }
 
     return PurchaseOrderItem(
-      id: _toInt(map['id']),
-      purchaseOrderId: _toInt(map['purchase_order_id']),
-      productId: _toInt(map['product_id']),
+      id: toInt(map['id']),
+      purchaseOrderId: toInt(map['purchase_order_id']),
+      productId: toInt(map['product_id']),
       productName: map['product_name']?.toString() ?? '',
-      quantity: _toDouble(map['quantity']),
-      unitPrice: _toDouble(map['unit_price']),
-      total: _toDouble(map['total']),
-      receivedQuantity: _toDouble(map['received_quantity']),
+      quantity: toDouble(map['quantity']),
+      unitPrice: toDouble(map['unit_price']),
+      total: toDouble(map['total']),
+      receivedQuantity: toDouble(map['received_quantity']),
     );
   }
 }

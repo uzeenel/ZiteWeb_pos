@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:pos_system/models/sales_return.dart';
-import 'package:pos_system/services/sales_return_service.dart';
-import 'package:pos_system/services/sale_service.dart';
-import 'package:pos_system/screens/unauthorized_screen.dart';
-import 'package:pos_system/utils/permissions.dart';
+import 'package:zite_web_pos/models/sales_return.dart';
+import 'package:zite_web_pos/services/sales_return_service.dart';
+import 'package:zite_web_pos/services/sale_service.dart';
+import 'package:zite_web_pos/screens/unauthorized_screen.dart';
+import 'package:zite_web_pos/utils/permissions.dart';
 
 class SalesReturnScreen extends StatefulWidget {
   const SalesReturnScreen({super.key});
@@ -21,14 +21,14 @@ class _SalesReturnScreenState extends State<SalesReturnScreen> {
   List<Map<String, dynamic>> _saleItems = [];
   Map<int, int> _selectedQuantities = {};
   bool _isLoading = false;
-  String _returnStatus = 'create';
+  String _returnStatus = 'view';
   List<SalesReturn> _returns = [];
   String _filterStatus = 'all';
 
   List<Map<String, dynamic>> _recentSales = [];
   bool _isLoadingSales = false;
   String _selectedInvoice = '';
-  DateTime _selectedDate = DateTime.now();
+  final DateTime _selectedDate = DateTime.now();
 
   final _currencyFormat = NumberFormat("#,##0.00");
   final _dateFormat = DateFormat('yyyy-MM-dd HH:mm');
@@ -74,6 +74,7 @@ class _SalesReturnScreenState extends State<SalesReturnScreen> {
       DateTime.now().subtract(const Duration(days: 30)),
       DateTime.now(),
     );
+    print('Returns loaded: ${returns.length}');
     setState(() {
       _returns = returns;
       _isLoading = false;
@@ -97,6 +98,16 @@ class _SalesReturnScreenState extends State<SalesReturnScreen> {
     setState(() => _isLoading = true);
     try {
       final items = await _service.getSaleItemsForReturn(invoiceNumber);
+
+      // Debug: Log what we got from the API
+      if (items.isNotEmpty) {
+        print('=== First item from API ===');
+        print('Product: ${items[0]['product_name']}');
+        print('Unit price (with VAT): ${items[0]['unit_price']}');
+        print('Total (with VAT): ${items[0]['total']}');
+        print('===========================');
+      }
+
       setState(() {
         _saleItems = items;
         _selectedQuantities = {};
@@ -127,15 +138,32 @@ class _SalesReturnScreenState extends State<SalesReturnScreen> {
       return;
     }
 
+    // Calculate total refund (VAT is already included in unit_price)
+    double totalRefund = 0;
     final itemsToReturn = _saleItems
         .where((item) {
           final quantity = _selectedQuantities[item['sale_item_id']] ?? 0;
           return quantity > 0;
         })
         .map((item) {
+          final quantity = _selectedQuantities[item['sale_item_id']] ?? 0;
+          // unit_price is already VAT-inclusive from the backend
+          final unitPrice = _toDouble(item['unit_price']);
+          final itemTotal = quantity * unitPrice;
+          totalRefund += itemTotal;
+
+          print('Product: ${item['product_name']}');
+          print('Unit Price (VAT inclusive): $unitPrice');
+          print('Quantity: $quantity');
+          print('Item Total: $itemTotal');
+
           return {
             'sale_item_id': item['sale_item_id'],
-            'quantity': _selectedQuantities[item['sale_item_id']],
+            'product_id': item['product_id'],
+            'product_name': item['product_name'],
+            'sku': item['sku'],
+            'quantity': quantity,
+            'unit_price': unitPrice, // This is already VAT-inclusive
             'reason': _reasonController.text.isEmpty
                 ? 'Customer return'
                 : _reasonController.text,
@@ -150,18 +178,62 @@ class _SalesReturnScreenState extends State<SalesReturnScreen> {
       return;
     }
 
+    print('Total Refund (from frontend): $totalRefund');
+
+    // Show confirmation dialog
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Confirm Return'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Are you sure you want to process this return?'),
+            const SizedBox(height: 8),
+            Text(
+              'Total Refund: ₦${_currencyFormat.format(totalRefund)}',
+              style: const TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 16,
+                color: Colors.green,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Note: This amount already includes 7.5% VAT',
+              style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text('Confirm Return'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+
     setState(() => _isLoading = true);
     try {
-      final sale = await _service.getSaleByInvoice(
-        _invoiceController.text.isNotEmpty
-            ? _invoiceController.text
-            : _selectedInvoice,
-      );
+      final invoiceNumber = _invoiceController.text.isNotEmpty
+          ? _invoiceController.text
+          : _selectedInvoice;
+
+      final sale = await _service.getSaleByInvoice(invoiceNumber);
+      print('Sale ID: ${sale?.id}');
+
       await _service.createReturn(
         saleId: sale!.id!,
-        invoiceNumber: _invoiceController.text.isNotEmpty
-            ? _invoiceController.text
-            : _selectedInvoice,
+        invoiceNumber: invoiceNumber,
         items: itemsToReturn,
         reason: _reasonController.text.isEmpty
             ? 'Customer return'
@@ -170,8 +242,10 @@ class _SalesReturnScreenState extends State<SalesReturnScreen> {
       );
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Return created successfully'),
+        SnackBar(
+          content: Text(
+            'Return of ₦${_currencyFormat.format(totalRefund)} created successfully!',
+          ),
           backgroundColor: Colors.green,
         ),
       );
@@ -187,6 +261,7 @@ class _SalesReturnScreenState extends State<SalesReturnScreen> {
       _loadReturns();
       _loadRecentSales();
     } catch (e) {
+      print('Error submitting return: $e');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
       );
@@ -213,7 +288,7 @@ class _SalesReturnScreenState extends State<SalesReturnScreen> {
               (item) => Padding(
                 padding: const EdgeInsets.only(left: 8, top: 4),
                 child: Text(
-                  '• ${item.productName} x${item.quantity} - ₦${_currencyFormat.format(item.total)}',
+                  '• ${item.productName} (SKU: ${item.sku}) x${item.quantity} - ₦${_currencyFormat.format(item.total)}',
                 ),
               ),
             ),
@@ -222,7 +297,7 @@ class _SalesReturnScreenState extends State<SalesReturnScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
+            child: const Text('Close'),
           ),
           if (returnData.status == ReturnStatus.pending)
             ElevatedButton(
@@ -308,15 +383,15 @@ class _SalesReturnScreenState extends State<SalesReturnScreen> {
                 children: [
                   Card(
                     child: Padding(
-                      padding: const EdgeInsets.all(16),
+                      padding: const EdgeInsets.all(12),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           const Text(
-                            'Recent Sales (Last 7 Days)',
+                            'Recent Sales',
                             style: TextStyle(
                               fontWeight: FontWeight.bold,
-                              fontSize: 14,
+                              fontSize: 13,
                             ),
                           ),
                           const SizedBox(height: 8),
@@ -324,82 +399,85 @@ class _SalesReturnScreenState extends State<SalesReturnScreen> {
                               ? const Center(child: CircularProgressIndicator())
                               : _recentSales.isEmpty
                               ? const Text('No recent sales')
-                              : SizedBox(
-                                  height: 120,
-                                  child: ListView.builder(
-                                    scrollDirection: Axis.horizontal,
-                                    itemCount: _recentSales.length,
-                                    itemBuilder: (context, index) {
-                                      final sale = _recentSales[index];
-                                      final isSelected =
-                                          _selectedInvoice ==
-                                          sale['invoice_number'];
-                                      return GestureDetector(
-                                        onTap: () {
-                                          setState(() {
-                                            _selectedInvoice =
-                                                sale['invoice_number'];
-                                            _invoiceController.clear();
-                                          });
-                                          _searchSale();
-                                        },
-                                        child: Container(
-                                          width: 150,
-                                          margin: const EdgeInsets.only(
-                                            right: 8,
+                              : Wrap(
+                                  spacing: 8,
+                                  runSpacing: 8,
+                                  children: _recentSales.map((sale) {
+                                    final isSelected =
+                                        _selectedInvoice ==
+                                        sale['invoice_number'];
+                                    return GestureDetector(
+                                      onTap: () {
+                                        setState(() {
+                                          _selectedInvoice =
+                                              sale['invoice_number'];
+                                          _invoiceController.clear();
+                                        });
+                                        _searchSale();
+                                      },
+                                      child: Container(
+                                        width: 120,
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 8,
+                                          vertical: 6,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: isSelected
+                                              ? Colors.blue.shade50
+                                              : Colors.grey.shade50,
+                                          borderRadius: BorderRadius.circular(
+                                            6,
                                           ),
-                                          padding: const EdgeInsets.all(8),
-                                          decoration: BoxDecoration(
+                                          border: Border.all(
                                             color: isSelected
-                                                ? Colors.blue.shade50
-                                                : Colors.grey.shade50,
-                                            borderRadius: BorderRadius.circular(
-                                              8,
-                                            ),
-                                            border: Border.all(
-                                              color: isSelected
-                                                  ? Colors.blue
-                                                  : Colors.grey.shade300,
-                                            ),
-                                          ),
-                                          child: Column(
-                                            mainAxisAlignment:
-                                                MainAxisAlignment.center,
-                                            children: [
-                                              Text(
-                                                sale['invoice_number'],
-                                                style: TextStyle(
-                                                  fontWeight: FontWeight.bold,
-                                                  fontSize: 12,
-                                                  color: isSelected
-                                                      ? Colors.blue
-                                                      : Colors.black,
-                                                ),
-                                              ),
-                                              const SizedBox(height: 4),
-                                              Text(
-                                                _shortDateFormat.format(
-                                                  DateTime.parse(
-                                                    sale['sale_date'],
-                                                  ),
-                                                ),
-                                                style: const TextStyle(
-                                                  fontSize: 10,
-                                                ),
-                                              ),
-                                              Text(
-                                                '₦${_currencyFormat.format(_toDouble(sale['total']))}',
-                                                style: const TextStyle(
-                                                  fontWeight: FontWeight.bold,
-                                                  fontSize: 11,
-                                                ),
-                                              ),
-                                            ],
+                                                ? Colors.blue
+                                                : Colors.grey.shade300,
+                                            width: 1,
                                           ),
                                         ),
-                                      );
-                                    },
-                                  ),
+                                        child: Column(
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.center,
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.center,
+                                          children: [
+                                            Text(
+                                              sale['invoice_number'],
+                                              style: TextStyle(
+                                                fontWeight: FontWeight.bold,
+                                                fontSize: 10,
+                                                color: isSelected
+                                                    ? Colors.blue
+                                                    : Colors.black87,
+                                              ),
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                            const SizedBox(height: 2),
+                                            Text(
+                                              _shortDateFormat.format(
+                                                DateTime.parse(
+                                                  sale['sale_date'],
+                                                ),
+                                              ),
+                                              style: const TextStyle(
+                                                fontSize: 9,
+                                                color: Colors.grey,
+                                              ),
+                                            ),
+                                            Text(
+                                              '₦${_currencyFormat.format(_toDouble(sale['total']))}',
+                                              style: const TextStyle(
+                                                fontWeight: FontWeight.bold,
+                                                fontSize: 10,
+                                                color: Colors.green,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    );
+                                  }).toList(),
                                 ),
                         ],
                       ),
@@ -461,6 +539,8 @@ class _SalesReturnScreenState extends State<SalesReturnScreen> {
                                 child: Column(
                                   children: [
                                     Row(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
                                       children: [
                                         Expanded(
                                           flex: 2,
@@ -481,32 +561,63 @@ class _SalesReturnScreenState extends State<SalesReturnScreen> {
                                                 ),
                                               ),
                                               Text(
-                                                '₦${_currencyFormat.format(_toDouble(item['unit_price']))} each',
+                                                '₦${_currencyFormat.format(_toDouble(item['unit_price']))} each (incl. VAT)',
                                                 style: const TextStyle(
-                                                  fontSize: 11,
+                                                  fontSize: 12,
+                                                  color: Colors.green,
+                                                  fontWeight: FontWeight.bold,
                                                 ),
                                               ),
                                             ],
                                           ),
                                         ),
                                         Expanded(
-                                          child: Text(
-                                            'Sold: ${item['quantity_sold']}',
+                                          child: Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.center,
+                                            children: [
+                                              Text(
+                                                'Sold: ${item['quantity_sold']}',
+                                                style: const TextStyle(
+                                                  fontSize: 12,
+                                                ),
+                                              ),
+                                            ],
                                           ),
                                         ),
                                         Expanded(
-                                          child: Text(
-                                            'Returned: ${item['quantity_returned']}',
+                                          child: Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.center,
+                                            children: [
+                                              Text(
+                                                'Returned: ${item['quantity_returned']}',
+                                                style: const TextStyle(
+                                                  fontSize: 12,
+                                                ),
+                                              ),
+                                              Text(
+                                                'Available: ${item['quantity_available']}',
+                                                style: const TextStyle(
+                                                  fontSize: 11,
+                                                  color: Colors.blue,
+                                                  fontWeight: FontWeight.bold,
+                                                ),
+                                              ),
+                                            ],
                                           ),
                                         ),
                                         SizedBox(
-                                          width: 80,
+                                          width: 70,
                                           child: DropdownButton<int>(
                                             value:
                                                 _selectedQuantities[item['sale_item_id']],
                                             hint: const Text('Qty'),
                                             items: List.generate(
-                                              int.parse(item['quantity_available']) + 1,
+                                              _toDouble(
+                                                    item['quantity_available'],
+                                                  ).toInt() +
+                                                  1,
                                               (i) => DropdownMenuItem(
                                                 value: i,
                                                 child: Text(i.toString()),
@@ -533,6 +644,39 @@ class _SalesReturnScreenState extends State<SalesReturnScreen> {
                                 ),
                               ),
                             ),
+                            // Show total refund amount (VAT-inclusive)
+                            if (_selectedQuantities.isNotEmpty)
+                              Container(
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: Colors.blue.shade50,
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(
+                                    color: Colors.blue.shade200,
+                                  ),
+                                ),
+                                child: Row(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    const Text(
+                                      'Total Refund Amount:',
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 14,
+                                      ),
+                                    ),
+                                    Text(
+                                      '₦${_currencyFormat.format(_calculateTotalRefund())}',
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 16,
+                                        color: Colors.green,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
                             const SizedBox(height: 12),
                             TextField(
                               controller: _reasonController,
@@ -547,8 +691,12 @@ class _SalesReturnScreenState extends State<SalesReturnScreen> {
                               onPressed: _submitReturn,
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: Colors.green,
+                                minimumSize: const Size(double.infinity, 50),
                               ),
-                              child: const Text('Submit Return Request'),
+                              child: const Text(
+                                'Submit Return Request',
+                                style: TextStyle(fontSize: 16),
+                              ),
                             ),
                           ],
                         ),
@@ -612,7 +760,7 @@ class _SalesReturnScreenState extends State<SalesReturnScreen> {
                                   width: 40,
                                   height: 40,
                                   decoration: BoxDecoration(
-                                    color: statusColor.withOpacity(0.1),
+                                    color: statusColor.withValues(alpha: 0.1),
                                     shape: BoxShape.circle,
                                   ),
                                   child: Icon(
@@ -639,7 +787,9 @@ class _SalesReturnScreenState extends State<SalesReturnScreen> {
                                         vertical: 2,
                                       ),
                                       decoration: BoxDecoration(
-                                        color: statusColor.withOpacity(0.2),
+                                        color: statusColor.withValues(
+                                          alpha: 0.2,
+                                        ),
                                         borderRadius: BorderRadius.circular(12),
                                       ),
                                       child: Text(
@@ -665,5 +815,17 @@ class _SalesReturnScreenState extends State<SalesReturnScreen> {
               ],
             ),
     );
+  }
+
+  // Helper method to calculate total refund
+  double _calculateTotalRefund() {
+    double total = 0.0;
+    for (final item in _saleItems) {
+      final quantity = _selectedQuantities[item['sale_item_id']] ?? 0;
+      if (quantity > 0) {
+        total += quantity * _toDouble(item['unit_price']);
+      }
+    }
+    return total;
   }
 }

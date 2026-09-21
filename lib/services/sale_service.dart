@@ -1,6 +1,6 @@
-import 'package:pos_system/services/api_service.dart';
-import 'package:pos_system/models/cart_item.dart';
-import 'package:pos_system/models/sale.dart';
+import 'package:zite_web_pos/services/api_service.dart';
+import 'package:zite_web_pos/models/cart_item.dart';
+import 'package:zite_web_pos/models/sale.dart';
 
 class SaleService {
   // Get all sales as maps (for SalesHistoryScreen)
@@ -19,7 +19,17 @@ class SaleService {
     DateTime end,
   ) async {
     try {
+      print('=== GET SALES BY DATE RANGE ===');
+      print('Start: ${start.toIso8601String()}');
+      print('End: ${end.toIso8601String()}');
+
       final response = await ApiService.getSalesByDateRange(start, end);
+      print('API Response length: ${response.length}');
+      for (var sale in response) {
+        print(
+          'Sale: ${sale['invoice_number']}, Date: ${sale['sale_date']}, Total: ${sale['total']}',
+        );
+      }
       return response;
     } catch (e) {
       print('Error fetching sales by date range from API: $e');
@@ -99,18 +109,34 @@ class SaleService {
       saleDate = DateTime.now();
     }
 
+    double _toDouble(dynamic value) {
+      if (value == null) return 0.0;
+      if (value is double) return value;
+      if (value is int) return value.toDouble();
+      if (value is String) return double.tryParse(value) ?? 0.0;
+      return 0.0;
+    }
+
+    int? _toIntOrNull(dynamic value) {
+      if (value == null) return null;
+      if (value is int) return value;
+      if (value is String) return int.tryParse(value);
+      if (value is double) return value.toInt();
+      return null;
+    }
+
     final sale = Sale(
-      id: map['id'],
+      id: _toIntOrNull(map['id']),
       invoiceNumber: map['invoice_number'] ?? '',
       saleDate: saleDate,
-      subtotal: (map['subtotal'] as num?)?.toDouble() ?? 0,
-      tax: (map['tax'] as num?)?.toDouble() ?? 0,
-      total: (map['total'] as num?)?.toDouble() ?? 0,
+      subtotal: _toDouble(map['subtotal']),
+      tax: _toDouble(map['tax']),
+      total: _toDouble(map['total']),
       paymentMethod: map['payment_method'] ?? 'Cash',
-      paidAmount: (map['paid_amount'] as num?)?.toDouble() ?? 0,
-      change: (map['change_amount'] as num?)?.toDouble() ?? 0,
-      customerId: map['customer_id'],
-      cashierId: map['cashier_id'],
+      paidAmount: _toDouble(map['paid_amount']),
+      change: _toDouble(map['change_amount']),
+      customerId: _toIntOrNull(map['customer_id']),
+      cashierId: _toIntOrNull(map['cashier_id']),
     );
 
     if (map['items'] != null && map['items'] is List) {
@@ -130,17 +156,35 @@ class SaleService {
       quantity = map['quantity'];
     } else if (map['quantity'] is double) {
       quantity = (map['quantity'] as double).toInt();
+    } else if (map['quantity'] is String) {
+      quantity = int.tryParse(map['quantity']) ?? 0;
     } else {
       quantity = 0;
     }
 
+    double _toDouble(dynamic value) {
+      if (value == null) return 0.0;
+      if (value is double) return value;
+      if (value is int) return value.toDouble();
+      if (value is String) return double.tryParse(value) ?? 0.0;
+      return 0.0;
+    }
+
+    int _toInt(dynamic value) {
+      if (value == null) return 0;
+      if (value is int) return value;
+      if (value is double) return value.toInt();
+      if (value is String) return int.tryParse(value) ?? 0;
+      return 0;
+    }
+
     return SaleItem(
-      id: map['id'] ?? 0,
+      id: _toInt(map['id']),
       saleId: saleId,
-      productId: map['product_id'] ?? 0,
+      productId: _toInt(map['product_id']),
       quantity: quantity,
-      unitPrice: (map['unit_price'] as num?)?.toDouble() ?? 0,
-      total: (map['total'] as num?)?.toDouble() ?? 0,
+      unitPrice: _toDouble(map['unit_price']),
+      total: _toDouble(map['total']),
       isVatExempt: map['is_vat_exempt'] == true || map['is_vat_exempt'] == 1,
       productName: map['product_name'],
       sku: map['sku'],

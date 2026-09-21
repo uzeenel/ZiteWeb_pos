@@ -1,11 +1,14 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:intl/intl.dart';
-import 'package:pos_system/models/sales_report.dart';
-import 'package:pos_system/services/sales_report_service.dart';
-import 'package:pos_system/services/export_service.dart' as expService;
-import 'package:pos_system/screens/unauthorized_screen.dart';
-import 'package:pos_system/utils/permissions.dart';
-import 'package:pos_system/services/sale_service.dart';
+import 'package:zite_web_pos/models/sales_report.dart';
+import 'package:zite_web_pos/services/sales_report_service.dart';
+import 'package:zite_web_pos/services/export_service.dart' as expService;
+import 'package:zite_web_pos/screens/unauthorized_screen.dart';
+import 'package:zite_web_pos/utils/permissions.dart';
+import 'package:zite_web_pos/services/sale_service.dart';
+import 'package:file_picker/file_picker.dart';
 
 class SalesReportScreen extends StatefulWidget {
   const SalesReportScreen({super.key});
@@ -17,7 +20,7 @@ class SalesReportScreen extends StatefulWidget {
 class _SalesReportScreenState extends State<SalesReportScreen> {
   final SalesReportService _service = SalesReportService();
   final SaleService _saleService = SaleService();
-  final expService.ExportService _exportService = expService.ExportService();
+  late expService.ExportService _exportService;
 
   DateTime _selectedDate = DateTime.now();
   SalesReportData? _reportData;
@@ -31,6 +34,7 @@ class _SalesReportScreenState extends State<SalesReportScreen> {
   @override
   void initState() {
     super.initState();
+    _exportService = expService.ExportService();
     _loadData();
   }
 
@@ -44,28 +48,12 @@ class _SalesReportScreenState extends State<SalesReportScreen> {
       );
       final endOfDay = startOfDay.add(const Duration(days: 1));
 
-      print('=== SALES REPORT DEBUG ===');
-      print('Selected date: $_selectedDate');
-      print('Start: $startOfDay');
-      print('End: $endOfDay');
-
       final sales = await _saleService.getSalesByDateRange(
         startOfDay,
         endOfDay,
       );
 
-      print('Sales returned: ${sales.length}');
-      if (sales.isNotEmpty) {
-        print('First sale date: ${sales.first['sale_date']}');
-        print('First sale total: ${sales.first['total']}');
-      } else {
-        print('No sales found for this date range');
-      }
-
       final data = await _service.getDailySalesReport(_selectedDate, sales);
-
-      print('Report data summary: ${data?.summary.totalSales}');
-      print('Report has ${data?.categoryReports.length} categories');
 
       setState(() {
         _reportData = data;
@@ -79,33 +67,28 @@ class _SalesReportScreenState extends State<SalesReportScreen> {
     }
   }
 
-  Future<void> _exportToExcel() async {
+    Future<void> _exportToExcel() async {
     if (_reportData == null) return;
     setState(() => _isExporting = true);
     try {
-      final file = await _exportService.exportSalesReportToExcel(
+      await _exportService.exportSalesReportToExcelWeb(
         _reportData!,
         _selectedDate,
       );
-      if (file != null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('File saved: ${file.path.split('/').last}'),
-            backgroundColor: Colors.green,
-          ),
-        );
-      } else {
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Save cancelled'),
-            backgroundColor: Colors.orange,
+            content: Text('Excel file downloaded successfully'),
+            backgroundColor: Colors.green,
           ),
         );
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+        );
+      }
     } finally {
       if (mounted) setState(() => _isExporting = false);
     }
@@ -115,29 +98,24 @@ class _SalesReportScreenState extends State<SalesReportScreen> {
     if (_reportData == null) return;
     setState(() => _isExporting = true);
     try {
-      final file = await _exportService.exportSalesReportToPdf(
+      await _exportService.exportSalesReportToPdfWeb(
         _reportData!,
         _selectedDate,
       );
-      if (file != null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('File saved: ${file.path.split('/').last}'),
-            backgroundColor: Colors.green,
-          ),
-        );
-      } else {
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Save cancelled'),
-            backgroundColor: Colors.orange,
+            content: Text('PDF file downloaded successfully'),
+            backgroundColor: Colors.green,
           ),
         );
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+        );
+      }
     } finally {
       if (mounted) setState(() => _isExporting = false);
     }
@@ -145,10 +123,11 @@ class _SalesReportScreenState extends State<SalesReportScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // Check permissions - Only Admin and Manager can view sales reports
     if (!Permissions.canViewReports) {
       return const UnauthorizedScreen();
     }
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Sales Report', style: TextStyle(fontSize: 18)),
@@ -229,9 +208,10 @@ class _SalesReportScreenState extends State<SalesReportScreen> {
                       Center(
                         child: Text(
                           _dateFormat.format(_selectedDate),
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 20,
                             fontWeight: FontWeight.bold,
+                            color: isDarkMode ? Colors.white : Colors.black87,
                           ),
                         ),
                       ),
@@ -280,19 +260,34 @@ class _SalesReportScreenState extends State<SalesReportScreen> {
                         ],
                       ),
                       const SizedBox(height: 20),
-                      const Text(
+                      Text(
                         'Payment Methods',
                         style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
+                          color: isDarkMode ? Colors.white : Colors.black87,
                         ),
                       ),
                       const SizedBox(height: 8),
                       Container(
-                        padding: const EdgeInsets.all(12),
+                        padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
-                          color: Colors.grey.shade50,
-                          borderRadius: BorderRadius.circular(8),
+                          color: isDarkMode
+                              ? Colors.grey.shade800
+                              : Colors.white,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: isDarkMode
+                                ? Colors.grey.shade700
+                                : Colors.grey.shade200,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.grey.withOpacity(0.05),
+                              blurRadius: 4,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
                         ),
                         child: Column(
                           children: _reportData!
@@ -306,35 +301,77 @@ class _SalesReportScreenState extends State<SalesReportScreen> {
                                               _reportData!.summary.totalSales) *
                                           100
                                     : 0;
+                                final colors = {
+                                  'Cash': Colors.green,
+                                  'Credit': Colors.purple,
+                                  'Transfer': Colors.blue,
+                                  'Card': Colors.orange,
+                                  'Layaway': Colors.teal,
+                                };
+                                final color = colors[entry.key] ?? Colors.grey;
+
                                 return Padding(
                                   padding: const EdgeInsets.symmetric(
-                                    vertical: 4,
+                                    vertical: 6,
                                   ),
-                                  child: Row(
+                                  child: Column(
                                     children: [
-                                      SizedBox(
-                                        width: 80,
-                                        child: Text(
-                                          entry.key,
-                                          style: const TextStyle(
-                                            fontWeight: FontWeight.w500,
+                                      Row(
+                                        children: [
+                                          Container(
+                                            width: 12,
+                                            height: 12,
+                                            decoration: BoxDecoration(
+                                              color: color,
+                                              borderRadius:
+                                                  BorderRadius.circular(3),
+                                            ),
                                           ),
-                                        ),
-                                      ),
-                                      Expanded(
-                                        child: LinearProgressIndicator(
-                                          value: percentage / 100,
-                                          backgroundColor: Colors.grey.shade200,
-                                          valueColor:
-                                              const AlwaysStoppedAnimation<
-                                                Color
-                                              >(Colors.green),
-                                        ),
-                                      ),
-                                      const SizedBox(width: 8),
-                                      Text(
-                                        '₦${_currencyFormat.format(entry.value)} (${percentage.toStringAsFixed(1)}%)',
-                                        style: const TextStyle(fontSize: 12),
+                                          const SizedBox(width: 10),
+                                          SizedBox(
+                                            width: 80,
+                                            child: Text(
+                                              entry.key,
+                                              style: TextStyle(
+                                                fontSize: 14,
+                                                fontWeight: FontWeight.w600,
+                                                color: isDarkMode
+                                                    ? Colors.white
+                                                    : Colors.black87,
+                                              ),
+                                            ),
+                                          ),
+                                          Expanded(
+                                            child: ClipRRect(
+                                              borderRadius:
+                                                  BorderRadius.circular(6),
+                                              child: LinearProgressIndicator(
+                                                value: percentage / 100,
+                                                backgroundColor: isDarkMode
+                                                    ? Colors.grey.shade700
+                                                    : Colors.grey.shade200,
+                                                minHeight: 8,
+                                                valueColor:
+                                                    AlwaysStoppedAnimation<
+                                                      Color
+                                                    >(color),
+                                              ),
+                                            ),
+                                          ),
+                                          const SizedBox(width: 12),
+                                          SizedBox(
+                                            width: 120,
+                                            child: Text(
+                                              '₦${_currencyFormat.format(entry.value)} (${percentage.toStringAsFixed(1)}%)',
+                                              style: TextStyle(
+                                                fontSize: 13,
+                                                fontWeight: FontWeight.w600,
+                                                color: color,
+                                              ),
+                                              textAlign: TextAlign.right,
+                                            ),
+                                          ),
+                                        ],
                                       ),
                                     ],
                                   ),
@@ -344,11 +381,12 @@ class _SalesReportScreenState extends State<SalesReportScreen> {
                         ),
                       ),
                       const SizedBox(height: 20),
-                      const Text(
+                      Text(
                         'Sales by Category',
                         style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
+                          color: isDarkMode ? Colors.white : Colors.black87,
                         ),
                       ),
                       const SizedBox(height: 8),
@@ -359,16 +397,34 @@ class _SalesReportScreenState extends State<SalesReportScreen> {
                         itemBuilder: (context, index) {
                           final category = _reportData!.categoryReports[index];
                           return Card(
+                            color: isDarkMode
+                                ? Colors.grey.shade800
+                                : Colors.white,
                             margin: const EdgeInsets.symmetric(vertical: 4),
                             child: ListTile(
-                              title: Text(category.category),
+                              title: Text(
+                                category.category,
+                                style: TextStyle(
+                                  color: isDarkMode
+                                      ? Colors.white
+                                      : Colors.black87,
+                                ),
+                              ),
                               subtitle: Text(
                                 '${category.quantitySold} units sold',
+                                style: TextStyle(
+                                  color: isDarkMode
+                                      ? Colors.grey.shade400
+                                      : Colors.grey.shade700,
+                                ),
                               ),
                               trailing: Text(
                                 '₦${_currencyFormat.format(category.totalRevenue)} (${category.percentageOfTotal.toStringAsFixed(1)}%)',
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontWeight: FontWeight.bold,
+                                  color: isDarkMode
+                                      ? Colors.white
+                                      : Colors.black87,
                                 ),
                               ),
                             ),
@@ -376,20 +432,24 @@ class _SalesReportScreenState extends State<SalesReportScreen> {
                         },
                       ),
                       const SizedBox(height: 20),
-                      // Product Sales Section
                       Row(
                         children: [
-                          const Text(
+                          Text(
                             'Sales by Product',
                             style: TextStyle(
                               fontSize: 18,
                               fontWeight: FontWeight.bold,
+                              color: isDarkMode ? Colors.white : Colors.black87,
                             ),
                           ),
                           const Spacer(),
                           Container(
                             decoration: BoxDecoration(
-                              border: Border.all(color: Colors.grey.shade300),
+                              border: Border.all(
+                                color: isDarkMode
+                                    ? Colors.grey.shade700
+                                    : Colors.grey.shade300,
+                              ),
                               borderRadius: BorderRadius.circular(20),
                             ),
                             child: Row(
@@ -402,64 +462,91 @@ class _SalesReportScreenState extends State<SalesReportScreen> {
                         ],
                       ),
                       const SizedBox(height: 12),
-                      // Summary row for products
                       Container(
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
-                          color: Colors.blue.shade50,
+                          color: isDarkMode
+                              ? Colors.blue.shade900
+                              : Colors.blue.shade50,
                           borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: Colors.blue.shade200),
+                          border: Border.all(
+                            color: isDarkMode
+                                ? Colors.blue.shade700
+                                : Colors.blue.shade200,
+                          ),
                         ),
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             Text(
                               'Total Products Sold: ${_reportData!.allProducts.length}',
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontWeight: FontWeight.w500,
+                                color: isDarkMode
+                                    ? Colors.white
+                                    : Colors.black87,
                               ),
                             ),
                             Text(
                               'Total Units: ${_reportData!.allProducts.fold<int>(0, (sum, p) => sum + p.quantitySold)}',
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontWeight: FontWeight.w500,
+                                color: isDarkMode
+                                    ? Colors.white
+                                    : Colors.black87,
                               ),
                             ),
                           ],
                         ),
                       ),
                       const SizedBox(height: 8),
-                      // Product list header
                       Container(
                         padding: const EdgeInsets.symmetric(
                           horizontal: 12,
                           vertical: 12,
                         ),
                         decoration: BoxDecoration(
-                          color: Colors.grey.shade200,
+                          color: isDarkMode
+                              ? Colors.grey.shade800
+                              : Colors.grey.shade200,
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Row(
-                          children: const [
+                          children: [
                             SizedBox(
                               width: 40,
                               child: Text(
                                 '#',
-                                style: TextStyle(fontWeight: FontWeight.bold),
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  color: isDarkMode
+                                      ? Colors.white
+                                      : Colors.black87,
+                                ),
                               ),
                             ),
                             Expanded(
                               flex: 3,
                               child: Text(
                                 'Product',
-                                style: TextStyle(fontWeight: FontWeight.bold),
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  color: isDarkMode
+                                      ? Colors.white
+                                      : Colors.black87,
+                                ),
                               ),
                             ),
                             SizedBox(
                               width: 50,
                               child: Text(
                                 'Qty',
-                                style: TextStyle(fontWeight: FontWeight.bold),
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  color: isDarkMode
+                                      ? Colors.white
+                                      : Colors.black87,
+                                ),
                                 textAlign: TextAlign.right,
                               ),
                             ),
@@ -467,7 +554,12 @@ class _SalesReportScreenState extends State<SalesReportScreen> {
                               width: 90,
                               child: Text(
                                 'Unit Price',
-                                style: TextStyle(fontWeight: FontWeight.bold),
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  color: isDarkMode
+                                      ? Colors.white
+                                      : Colors.black87,
+                                ),
                                 textAlign: TextAlign.right,
                               ),
                             ),
@@ -475,7 +567,12 @@ class _SalesReportScreenState extends State<SalesReportScreen> {
                               width: 100,
                               child: Text(
                                 'Total',
-                                style: TextStyle(fontWeight: FontWeight.bold),
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  color: isDarkMode
+                                      ? Colors.white
+                                      : Colors.black87,
+                                ),
                                 textAlign: TextAlign.right,
                               ),
                             ),
@@ -483,14 +580,18 @@ class _SalesReportScreenState extends State<SalesReportScreen> {
                               width: 60,
                               child: Text(
                                 '%',
-                                style: TextStyle(fontWeight: FontWeight.bold),
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  color: isDarkMode
+                                      ? Colors.white
+                                      : Colors.black87,
+                                ),
                                 textAlign: TextAlign.right,
                               ),
                             ),
                           ],
                         ),
                       ),
-                      // Product list
                       ListView.builder(
                         shrinkWrap: true,
                         physics: const NeverScrollableScrollPhysics(),
@@ -506,6 +607,9 @@ class _SalesReportScreenState extends State<SalesReportScreen> {
                                   _reportData!.summary.totalSales) *
                               100;
                           return Card(
+                            color: isDarkMode
+                                ? Colors.grey.shade800
+                                : Colors.white,
                             margin: const EdgeInsets.symmetric(vertical: 2),
                             child: Padding(
                               padding: const EdgeInsets.symmetric(
@@ -521,7 +625,9 @@ class _SalesReportScreenState extends State<SalesReportScreen> {
                                       '${index + 1}',
                                       style: TextStyle(
                                         fontWeight: FontWeight.w500,
-                                        color: Colors.grey.shade700,
+                                        color: isDarkMode
+                                            ? Colors.white
+                                            : Colors.black87,
                                       ),
                                     ),
                                   ),
@@ -533,15 +639,22 @@ class _SalesReportScreenState extends State<SalesReportScreen> {
                                       children: [
                                         Text(
                                           product.productName,
-                                          style: const TextStyle(
-                                            fontWeight: FontWeight.w500,
+                                          style: TextStyle(
+                                            fontSize: 14,
+                                            fontWeight: FontWeight.w600,
+                                            color: isDarkMode
+                                                ? Colors.white
+                                                : Colors.black87,
                                           ),
                                         ),
                                         Text(
                                           'SKU: ${product.sku} | Category: ${product.category}',
                                           style: TextStyle(
-                                            fontSize: 11,
-                                            color: Colors.grey.shade600,
+                                            fontSize: 12,
+                                            color: isDarkMode
+                                                ? Colors.grey.shade400
+                                                : Colors.grey.shade700,
+                                            fontWeight: FontWeight.w400,
                                           ),
                                         ),
                                       ],
@@ -551,8 +664,12 @@ class _SalesReportScreenState extends State<SalesReportScreen> {
                                     width: 50,
                                     child: Text(
                                       '${product.quantitySold}',
-                                      style: const TextStyle(
-                                        fontWeight: FontWeight.w500,
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w600,
+                                        color: isDarkMode
+                                            ? Colors.white
+                                            : Colors.black87,
                                       ),
                                       textAlign: TextAlign.right,
                                     ),
@@ -562,15 +679,25 @@ class _SalesReportScreenState extends State<SalesReportScreen> {
                                     child: Text(
                                       '₦${_currencyFormat.format(product.unitPrice)}',
                                       textAlign: TextAlign.right,
-                                      style: const TextStyle(fontSize: 12),
+                                      style: TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w500,
+                                        color: isDarkMode
+                                            ? Colors.white
+                                            : Colors.black87,
+                                      ),
                                     ),
                                   ),
                                   SizedBox(
                                     width: 100,
                                     child: Text(
                                       '₦${_currencyFormat.format(product.totalRevenue)}',
-                                      style: const TextStyle(
+                                      style: TextStyle(
+                                        fontSize: 14,
                                         fontWeight: FontWeight.bold,
+                                        color: isDarkMode
+                                            ? Colors.blue.shade300
+                                            : const Color(0xFF1e3a8a),
                                       ),
                                       textAlign: TextAlign.right,
                                     ),
@@ -584,7 +711,9 @@ class _SalesReportScreenState extends State<SalesReportScreen> {
                                         fontSize: 12,
                                         color: percentage > 20
                                             ? Colors.green
-                                            : Colors.grey.shade700,
+                                            : isDarkMode
+                                            ? Colors.white70
+                                            : Colors.black87,
                                         fontWeight: percentage > 20
                                             ? FontWeight.bold
                                             : FontWeight.normal,
@@ -624,6 +753,7 @@ class _SalesReportScreenState extends State<SalesReportScreen> {
   }
 
   Widget _buildViewToggle(String label, String value) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     final isSelected = _productView == value;
     return GestureDetector(
       onTap: () {
@@ -640,7 +770,11 @@ class _SalesReportScreenState extends State<SalesReportScreen> {
         child: Text(
           label,
           style: TextStyle(
-            color: isSelected ? Colors.white : Colors.grey.shade700,
+            color: isSelected
+                ? Colors.white
+                : isDarkMode
+                ? Colors.grey.shade300
+                : Colors.grey.shade700,
             fontWeight: isSelected ? FontWeight.w500 : FontWeight.normal,
           ),
         ),
@@ -654,12 +788,13 @@ class _SalesReportScreenState extends State<SalesReportScreen> {
     Color color,
     IconData icon,
   ) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: color.withOpacity(0.3)),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -684,7 +819,7 @@ class _SalesReportScreenState extends State<SalesReportScreen> {
             style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.bold,
-              color: color,
+              color: isDarkMode ? Colors.white : color,
             ),
           ),
         ],

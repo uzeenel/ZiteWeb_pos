@@ -43,17 +43,57 @@ class SalesReturn {
   }
 
   factory SalesReturn.fromMap(Map<String, dynamic> map) {
+    double _toDouble(dynamic value) {
+      if (value == null) return 0.0;
+      if (value is double) return value;
+      if (value is int) return value.toDouble();
+      if (value is String) return double.tryParse(value) ?? 0.0;
+      return 0.0;
+    }
+
+    int _toInt(dynamic value) {
+      if (value == null) return 0;
+      if (value is int) return value;
+      if (value is double) return value.toInt();
+      if (value is String) return int.tryParse(value) ?? 0;
+      return 0;
+    }
+
+    // Parse items
+    List<ReturnItem> items = [];
+    if (map['items'] != null && map['items'] is List) {
+      items = (map['items'] as List).map((item) {
+        return ReturnItem(
+          id: _toInt(item['id']),
+          returnId: _toInt(item['return_id']),
+          saleItemId: _toInt(item['sale_item_id']),
+          productId: _toInt(item['product_id']),
+          productName: item['product_name'] ?? '',
+          sku: item['sku'] ?? '',
+          quantity: _toInt(item['quantity']),
+          unitPrice: _toDouble(item['unit_price']),
+          total: _toDouble(item['total']),
+          reason: item['reason'] ?? '',
+        );
+      }).toList();
+    }
+
     return SalesReturn(
-      id: map['id'],
-      returnNumber: map['return_number'],
-      saleId: map['sale_id'],
-      invoiceNumber: map['invoice_number'],
-      returnDate: DateTime.parse(map['return_date']),
-      totalRefund: map['total_refund'].toDouble(),
-      reason: map['reason'],
-      status: stringToStatus(map['status']),
-      cashierId: map['cashier_id'],
-      createdAt: DateTime.parse(map['created_at']),
+      id: _toInt(map['id']),
+      returnNumber: map['return_number'] ?? '',
+      saleId: _toInt(map['sale_id']),
+      invoiceNumber: map['invoice_number'] ?? '',
+      returnDate: map['return_date'] != null
+          ? DateTime.parse(map['return_date'])
+          : DateTime.now(),
+      totalRefund: _toDouble(map['total_refund']),
+      reason: map['reason'] ?? '',
+      status: stringToStatus(map['status'] ?? 'pending'),
+      cashierId: _toInt(map['cashier_id']),
+      createdAt: map['created_at'] != null
+          ? DateTime.parse(map['created_at'])
+          : DateTime.now(),
+      items: items,
     );
   }
 
@@ -127,17 +167,33 @@ class ReturnItem {
   }
 
   factory ReturnItem.fromMap(Map<String, dynamic> map) {
+    double _toDouble(dynamic value) {
+      if (value == null) return 0.0;
+      if (value is double) return value;
+      if (value is int) return value.toDouble();
+      if (value is String) return double.tryParse(value) ?? 0.0;
+      return 0.0;
+    }
+
+    int _toInt(dynamic value) {
+      if (value == null) return 0;
+      if (value is int) return value;
+      if (value is double) return value.toInt();
+      if (value is String) return int.tryParse(value) ?? 0;
+      return 0;
+    }
+
     return ReturnItem(
-      id: map['id'],
-      returnId: map['return_id'],
-      saleItemId: map['sale_item_id'],
-      productId: map['product_id'],
-      productName: map['product_name'],
-      sku: map['sku'],
-      quantity: map['quantity'],
-      unitPrice: map['unit_price'].toDouble(),
-      total: map['total'].toDouble(),
-      reason: map['reason'],
+      id: _toInt(map['id']),
+      returnId: _toInt(map['return_id']),
+      saleItemId: _toInt(map['sale_item_id']),
+      productId: _toInt(map['product_id']),
+      productName: map['product_name'] ?? '',
+      sku: map['sku'] ?? '',
+      quantity: _toInt(map['quantity']),
+      unitPrice: _toDouble(map['unit_price']),
+      total: _toDouble(map['total']),
+      reason: map['reason'] ?? '',
     );
   }
 }

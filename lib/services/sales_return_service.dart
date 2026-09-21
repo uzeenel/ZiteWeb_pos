@@ -1,6 +1,6 @@
-import 'package:pos_system/models/sales_return.dart';
-import 'package:pos_system/models/sale.dart';
-import 'package:pos_system/services/api_service.dart';
+import 'package:zite_web_pos/models/sales_return.dart';
+import 'package:zite_web_pos/models/sale.dart';
+import 'package:zite_web_pos/services/api_service.dart';
 
 class SalesReturnService {
   // Get sale by invoice number
@@ -127,18 +127,33 @@ class SalesReturnService {
 
   // Helper to map API response to Sale object
   Sale _mapToSale(Map<String, dynamic> map) {
-    // Parse items if they exist
+    double _toDouble(dynamic value) {
+      if (value == null) return 0.0;
+      if (value is double) return value;
+      if (value is int) return value.toDouble();
+      if (value is String) return double.tryParse(value) ?? 0.0;
+      return 0.0;
+    }
+
+    int _toInt(dynamic value) {
+      if (value == null) return 0;
+      if (value is int) return value;
+      if (value is double) return value.toInt();
+      if (value is String) return int.tryParse(value) ?? 0;
+      return 0;
+    }
+
     List<SaleItem> items = [];
     if (map['items'] != null && map['items'] is List) {
       items = (map['items'] as List)
           .map(
             (item) => SaleItem(
-              id: item['id'],
-              saleId: map['id'],
-              productId: item['product_id'],
-              quantity: (item['quantity'] as num).toInt(),
-              unitPrice: (item['unit_price'] as num).toDouble(),
-              total: (item['total'] as num).toDouble(),
+              id: _toInt(item['id']),
+              saleId: _toInt(map['id']),
+              productId: _toInt(item['product_id']),
+              quantity: _toInt(item['quantity']),
+              unitPrice: _toDouble(item['unit_price']),
+              total: _toDouble(item['total']),
               isVatExempt: item['is_vat_exempt'] == 1,
               productName: item['product_name'],
               sku: item['sku'],
@@ -149,17 +164,17 @@ class SalesReturnService {
     }
 
     return Sale(
-      id: map['id'],
+      id: _toInt(map['id']),
       invoiceNumber: map['invoice_number'] ?? '',
       saleDate: DateTime.parse(map['sale_date']),
-      subtotal: (map['subtotal'] as num?)?.toDouble() ?? 0,
-      tax: (map['tax'] as num?)?.toDouble() ?? 0,
-      total: (map['total'] as num?)?.toDouble() ?? 0,
+      subtotal: _toDouble(map['subtotal']),
+      tax: _toDouble(map['tax']),
+      total: _toDouble(map['total']),
       paymentMethod: map['payment_method'] ?? 'Cash',
-      paidAmount: (map['paid_amount'] as num?)?.toDouble() ?? 0,
-      change: (map['change_amount'] as num?)?.toDouble() ?? 0,
-      customerId: map['customer_id'],
-      cashierId: map['cashier_id'],
+      paidAmount: _toDouble(map['paid_amount']),
+      change: _toDouble(map['change_amount']),
+      customerId: _toInt(map['customer_id']),
+      cashierId: _toInt(map['cashier_id']),
       items: items,
     );
   }

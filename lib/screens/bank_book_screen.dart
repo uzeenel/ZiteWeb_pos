@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:pos_system/models/bank_book.dart';
-import 'package:pos_system/services/bank_book_service.dart';
-import 'package:pos_system/services/export_service.dart' as expService;
-import 'package:pos_system/screens/unauthorized_screen.dart';
-import 'package:pos_system/utils/permissions.dart';
+import 'package:zite_web_pos/models/bank_account.dart';
+import 'package:zite_web_pos/models/bank_book.dart';
+import 'package:zite_web_pos/services/bank_book_service.dart';
+// import 'package:zite_web_pos/services/export_service.dart' as expService;
+import 'package:zite_web_pos/screens/unauthorized_screen.dart';
+import 'package:zite_web_pos/utils/permissions.dart';
+// import 'package:zite_web_pos/models/bank.dart';
+import 'package:zite_web_pos/services/bank_service.dart';
 
 class BankBookScreen extends StatefulWidget {
   const BankBookScreen({super.key});
@@ -15,25 +18,16 @@ class BankBookScreen extends StatefulWidget {
 
 class _BankBookScreenState extends State<BankBookScreen> {
   final BankBookService _service = BankBookService();
-  final expService.ExportService _exportService = expService.ExportService();
+  // final expService.ExportService _exportService = expService.ExportService();
   List<BankTransaction> _transactions = [];
   DateTime _selectedDate = DateTime.now();
-  Map<String, double> _openingBalances = {};
+  final Map<String, double> _openingBalances = {};
   BankSummary? _summary;
   bool _isLoading = true;
-  bool _isExporting = false;
+  // final bool _isExporting = false;
 
   final _currencyFormat = NumberFormat("#,##0.00");
   final _dateFormat = DateFormat('yyyy-MM-dd');
-
-  final List<String> _bankAccounts = [
-    'First Bank',
-    'GTBank',
-    'UBA',
-    'Access Bank',
-    'Zenith Bank',
-    'Other',
-  ];
 
   @override
   void initState() {
@@ -70,7 +64,7 @@ class _BankBookScreenState extends State<BankBookScreen> {
       _openingBalances,
     );
     print(
-      'Summary: deposits=${summary?.totalDeposits}, withdrawals=${summary?.totalWithdrawals}',
+      'Summary: deposits=${summary.totalDeposits}, withdrawals=${summary.totalWithdrawals}',
     );
 
     setState(() {
@@ -81,12 +75,17 @@ class _BankBookScreenState extends State<BankBookScreen> {
   }
 
   Future<void> _addTransaction({required bool isDeposit}) async {
-    final TextEditingController amountController = TextEditingController();
-    final TextEditingController descriptionController = TextEditingController();
-    final TextEditingController referenceController = TextEditingController();
-    final TextEditingController chequeController = TextEditingController();
-    String selectedBank = _bankAccounts.first;
-    String selectedAccount = 'Main Account';
+    final amountController = TextEditingController();
+    final descriptionController = TextEditingController();
+    final referenceController = TextEditingController();
+    final chequeController = TextEditingController();
+
+    BankAccount? selectedAccount;
+    bool isLoadingAccount = true;
+
+    // Load the bank account
+    selectedAccount = await _getDefaultBankAccount();
+    isLoadingAccount = false;
 
     await showDialog(
       context: context,
@@ -100,6 +99,34 @@ class _BankBookScreenState extends State<BankBookScreen> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
+                    // Show selected account info (read-only)
+                    if (isLoadingAccount)
+                      const Center(child: CircularProgressIndicator())
+                    else if (selectedAccount != null)
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: Colors.blue.shade50,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Colors.blue.shade200),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Account: ${selectedAccount.accountName}',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            Text('Bank: ${selectedAccount.bankName}'),
+                            Text(
+                              'Account No: ${selectedAccount.accountNumber ?? 'N/A'}',
+                            ),
+                          ],
+                        ),
+                      ),
+                    const SizedBox(height: 12),
                     TextField(
                       controller: amountController,
                       decoration: const InputDecoration(
@@ -108,23 +135,6 @@ class _BankBookScreenState extends State<BankBookScreen> {
                         border: OutlineInputBorder(),
                       ),
                       keyboardType: TextInputType.number,
-                    ),
-                    const SizedBox(height: 12),
-                    DropdownButtonFormField<String>(
-                      value: selectedBank,
-                      decoration: const InputDecoration(
-                        labelText: 'Bank',
-                        border: OutlineInputBorder(),
-                      ),
-                      items: _bankAccounts.map((bank) {
-                        return DropdownMenuItem(
-                          value: bank,
-                          child: Text(bank),
-                        );
-                      }).toList(),
-                      onChanged: (value) {
-                        if (value != null) setState(() => selectedBank = value);
-                      },
                     ),
                     const SizedBox(height: 12),
                     TextField(
@@ -164,36 +174,54 @@ class _BankBookScreenState extends State<BankBookScreen> {
                     final amount = double.tryParse(amountController.text) ?? 0;
                     if (amount <= 0) {
                       ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Please enter a valid amount')),
+                        const SnackBar(
+                          content: Text('Please enter a valid amount'),
+                        ),
                       );
                       return;
                     }
                     if (descriptionController.text.isEmpty) {
                       ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Please enter a description')),
+                        const SnackBar(
+                          content: Text('Please enter a description'),
+                        ),
+                      );
+                      return;
+                    }
+                    if (selectedAccount == null) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('No bank account found')),
                       );
                       return;
                     }
 
                     final transaction = BankTransaction(
                       date: _selectedDate,
-                      type: isDeposit ? BankTransactionType.deposit : BankTransactionType.withdrawal,
+                      type: isDeposit
+                          ? BankTransactionType.deposit
+                          : BankTransactionType.withdrawal,
                       amount: amount,
-                      accountName: selectedAccount,
-                      bankName: selectedBank,
-                      chequeNumber: chequeController.text.isNotEmpty ? chequeController.text : null,
+                      accountName: selectedAccount.accountName,
+                      bankName: selectedAccount.bankName,
+                      chequeNumber: chequeController.text.isNotEmpty
+                          ? chequeController.text
+                          : null,
                       description: descriptionController.text,
-                      reference: referenceController.text.isNotEmpty ? referenceController.text : null,
+                      reference: referenceController.text.isNotEmpty
+                          ? referenceController.text
+                          : null,
                       createdAt: DateTime.now(),
                     );
 
                     await _service.addTransaction(transaction);
                     Navigator.pop(context);
                     _loadData();
-                    
+
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
-                        content: Text('${isDeposit ? 'Deposit' : 'Withdrawal'} recorded successfully'),
+                        content: Text(
+                          '${isDeposit ? 'Deposit' : 'Withdrawal'} recorded successfully',
+                        ),
                         backgroundColor: Colors.green,
                       ),
                     );
@@ -208,12 +236,27 @@ class _BankBookScreenState extends State<BankBookScreen> {
     );
   }
 
+  Future<BankAccount?> _getDefaultBankAccount() async {
+    try {
+      final accounts = await BankService.getBankAccounts();
+      if (accounts.isNotEmpty) {
+        return accounts.first;
+      }
+      return null;
+    } catch (e) {
+      print('Error loading bank account: $e');
+      return null;
+    }
+  }
+
   Future<void> _deleteTransaction(BankTransaction transaction) async {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Delete Transaction'),
-        content: const Text('Are you sure you want to delete this transaction?'),
+        content: const Text(
+          'Are you sure you want to delete this transaction?',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -232,7 +275,10 @@ class _BankBookScreenState extends State<BankBookScreen> {
       await _service.deleteTransaction(transaction.id!);
       _loadData();
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Transaction deleted'), backgroundColor: Colors.red),
+        const SnackBar(
+          content: Text('Transaction deleted'),
+          backgroundColor: Colors.red,
+        ),
       );
     }
   }
@@ -281,7 +327,9 @@ class _BankBookScreenState extends State<BankBookScreen> {
             icon: const Icon(Icons.chevron_right),
             onPressed: () {
               final nextDay = _selectedDate.add(const Duration(days: 1));
-              if (nextDay.isBefore(DateTime.now().add(const Duration(days: 1)))) {
+              if (nextDay.isBefore(
+                DateTime.now().add(const Duration(days: 1)),
+              )) {
                 setState(() {
                   _selectedDate = nextDay;
                   _loadData();
@@ -309,7 +357,10 @@ class _BankBookScreenState extends State<BankBookScreen> {
                     children: [
                       Text(
                         _dateFormat.format(_selectedDate),
-                        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                       const SizedBox(height: 8),
                       Row(
@@ -410,30 +461,44 @@ class _BankBookScreenState extends State<BankBookScreen> {
                 // Transactions List
                 Expanded(
                   child: _transactions.isEmpty
-                      ? const Center(child: Text('No transactions for this day'))
+                      ? const Center(
+                          child: Text('No transactions for this day'),
+                        )
                       : ListView.builder(
                           itemCount: _transactions.length,
                           itemBuilder: (context, index) {
                             final transaction = _transactions[index];
-                            final isDeposit = transaction.type == BankTransactionType.deposit;
+                            final isDeposit =
+                                transaction.type == BankTransactionType.deposit;
                             return Card(
-                              margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                              margin: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 4,
+                              ),
                               child: ListTile(
                                 leading: Container(
                                   width: 40,
                                   height: 40,
                                   decoration: BoxDecoration(
-                                    color: (isDeposit ? Colors.green : Colors.red).withOpacity(0.1),
+                                    color:
+                                        (isDeposit ? Colors.green : Colors.red)
+                                            .withValues(alpha: 0.1),
                                     shape: BoxShape.circle,
                                   ),
                                   child: Icon(
-                                    isDeposit ? Icons.arrow_downward : Icons.arrow_upward,
-                                    color: isDeposit ? Colors.green : Colors.red,
+                                    isDeposit
+                                        ? Icons.arrow_downward
+                                        : Icons.arrow_upward,
+                                    color: isDeposit
+                                        ? Colors.green
+                                        : Colors.red,
                                   ),
                                 ),
                                 title: Text(
                                   transaction.description,
-                                  style: const TextStyle(fontWeight: FontWeight.w500),
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w500,
+                                  ),
                                 ),
                                 subtitle: Text(
                                   '${transaction.bankName} | ${transaction.accountName}${transaction.chequeNumber != null ? ' | Chq: ${transaction.chequeNumber}' : ''}',
@@ -447,13 +512,18 @@ class _BankBookScreenState extends State<BankBookScreen> {
                                       '${isDeposit ? '+' : '-'}₦${_currencyFormat.format(transaction.amount)}',
                                       style: TextStyle(
                                         fontWeight: FontWeight.bold,
-                                        color: isDeposit ? Colors.green : Colors.red,
+                                        color: isDeposit
+                                            ? Colors.green
+                                            : Colors.red,
                                         fontSize: 14,
                                       ),
                                     ),
                                     Text(
                                       _dateFormat.format(transaction.date),
-                                      style: const TextStyle(fontSize: 11, color: Colors.grey),
+                                      style: const TextStyle(
+                                        fontSize: 11,
+                                        color: Colors.grey,
+                                      ),
                                     ),
                                   ],
                                 ),
@@ -468,13 +538,18 @@ class _BankBookScreenState extends State<BankBookScreen> {
     );
   }
 
-  Widget _buildSummaryCard(String title, String value, Color color, IconData icon) {
+  Widget _buildSummaryCard(
+    String title,
+    String value,
+    Color color,
+    IconData icon,
+  ) {
     return Container(
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: color.withOpacity(0.3)),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

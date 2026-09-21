@@ -45,20 +45,36 @@ class Sale {
   }
 
   factory Sale.fromMap(Map<String, dynamic> map) {
+    double _toDouble(dynamic value) {
+      if (value == null) return 0.0;
+      if (value is double) return value;
+      if (value is int) return value.toDouble();
+      if (value is String) return double.tryParse(value) ?? 0.0;
+      return 0.0;
+    }
+
+    int _toInt(dynamic value) {
+      if (value == null) return 0;
+      if (value is int) return value;
+      if (value is double) return value.toInt();
+      if (value is String) return int.tryParse(value) ?? 0;
+      return 0;
+    }
+
     return Sale(
-      id: map['id'] as int?,
+      id: _toInt(map['id']),
       invoiceNumber: map['invoice_number'] as String? ?? '',
       saleDate: map['sale_date'] != null
           ? DateTime.parse(map['sale_date'] as String)
           : DateTime.now(),
-      subtotal: (map['subtotal'] as num?)?.toDouble() ?? 0,
-      tax: (map['tax'] as num?)?.toDouble() ?? 0,
-      total: (map['total'] as num?)?.toDouble() ?? 0,
+      subtotal: _toDouble(map['subtotal']),
+      tax: _toDouble(map['tax']),
+      total: _toDouble(map['total']),
       paymentMethod: map['payment_method'] as String? ?? 'Cash',
-      paidAmount: (map['paid_amount'] as num?)?.toDouble() ?? 0,
-      change: (map['change'] as num?)?.toDouble() ?? 0,
-      customerId: map['customer_id'] as int?,
-      cashierId: map['cashier_id'] as int?,
+      paidAmount: _toDouble(map['paid_amount']),
+      change: _toDouble(map['change_amount']),
+      customerId: _toInt(map['customer_id']),
+      cashierId: _toInt(map['cashier_id']),
     );
   }
 }
@@ -103,23 +119,29 @@ class SaleItem {
   }
 
   factory SaleItem.fromMap(Map<String, dynamic> map) {
-    final quantityValue = map['quantity'];
-    int quantityInt;
-    if (quantityValue is int) {
-      quantityInt = quantityValue;
-    } else if (quantityValue is double) {
-      quantityInt = quantityValue.toInt();
-    } else {
-      quantityInt = 0;
+    double _toDouble(dynamic value) {
+      if (value == null) return 0.0;
+      if (value is double) return value;
+      if (value is int) return value.toDouble();
+      if (value is String) return double.tryParse(value) ?? 0.0;
+      return 0.0;
+    }
+
+    int _toInt(dynamic value) {
+      if (value == null) return 0;
+      if (value is int) return value;
+      if (value is double) return value.toInt();
+      if (value is String) return int.tryParse(value) ?? 0;
+      return 0;
     }
 
     return SaleItem(
-      id: map['id'] as int,
-      saleId: map['sale_id'] as int,
-      productId: map['product_id'] as int,
-      quantity: quantityInt,
-      unitPrice: (map['unit_price'] as num).toDouble(),
-      total: (map['total'] as num).toDouble(),
+      id: _toInt(map['id']),
+      saleId: _toInt(map['sale_id']),
+      productId: _toInt(map['product_id']),
+      quantity: _toInt(map['quantity']),
+      unitPrice: _toDouble(map['unit_price']),
+      total: _toDouble(map['total']),
       isVatExempt: map['is_vat_exempt'] == 1,
       productName: map['product_name'] as String?,
       sku: map['sku'] as String?,

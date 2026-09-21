@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:fl_chart/fl_chart.dart';
-import 'package:pos_system/models/dashboard_data.dart';
-import 'package:pos_system/services/dashboard_service.dart';
-import 'package:pos_system/utils/permissions.dart';
-import 'package:pos_system/screens/unauthorized_screen.dart';
+import 'package:zite_web_pos/models/dashboard_data.dart';
+import 'package:zite_web_pos/services/dashboard_service.dart';
+import 'package:zite_web_pos/utils/permissions.dart';
+import 'package:zite_web_pos/screens/unauthorized_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -127,10 +127,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       const SizedBox(width: 12),
                       Expanded(
                         child: _buildKpiCard(
-                          'Low Stock',
-                          _data!.lowStockCount.toString(),
-                          Icons.warning_amber,
-                          Colors.red,
+                          'Total Customers',
+                          _data!.totalCustomers.toString(),
+                          Icons.people,
+                          Colors.purple,
                         ),
                       ),
                     ],
@@ -151,7 +151,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       borderRadius: BorderRadius.circular(12),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.grey.withOpacity(0.1),
+                          color: Colors.grey.withValues(alpha: 0.1),
                           spreadRadius: 1,
                           blurRadius: 4,
                         ),
@@ -175,7 +175,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       borderRadius: BorderRadius.circular(12),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.grey.withOpacity(0.1),
+                          color: Colors.grey.withValues(alpha: 0.1),
                           spreadRadius: 1,
                           blurRadius: 4,
                         ),
@@ -209,26 +209,82 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       itemCount: _data!.topProducts.length,
                       itemBuilder: (context, index) {
                         final product = _data!.topProducts[index];
-                        return ListTile(
-                          leading: CircleAvatar(
-                            backgroundColor: Colors.blue.shade100,
-                            child: Text('${index + 1}'),
+                        return Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 12,
                           ),
-                          title: Text(product.productName),
-                          subtitle: Text('SKU: ${product.sku}'),
-                          trailing: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            crossAxisAlignment: CrossAxisAlignment.end,
+                          decoration: BoxDecoration(
+                            border: Border(
+                              bottom: index < _data!.topProducts.length - 1
+                                  ? BorderSide(color: Colors.grey.shade200)
+                                  : BorderSide.none,
+                            ),
+                          ),
+                          child: Row(
                             children: [
-                              Text(
-                                '₦${_currencyFormat.format(product.revenue)}',
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.bold,
+                              Container(
+                                width: 28,
+                                height: 28,
+                                decoration: BoxDecoration(
+                                  color: Colors.blue.shade100,
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Center(
+                                  child: Text(
+                                    '${index + 1}',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.blue.shade700,
+                                    ),
+                                  ),
                                 ),
                               ),
-                              Text(
-                                '${product.quantitySold} units',
-                                style: const TextStyle(fontSize: 11),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      product.productName,
+                                      style: const TextStyle(
+                                        fontSize: 15,
+                                        fontWeight: FontWeight.w600,
+                                        color: Colors.black87,
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                    Text(
+                                      'SKU: ${product.sku}',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: Colors.grey.shade600,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.end,
+                                children: [
+                                  Text(
+                                    '₦${_currencyFormat.format(product.revenue)}',
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.blue.shade800,
+                                    ),
+                                  ),
+                                  Text(
+                                    '${product.quantitySold} units',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: Colors.grey.shade600,
+                                    ),
+                                  ),
+                                ],
                               ),
                             ],
                           ),
@@ -243,29 +299,89 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     Container(
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
-                        color: Colors.red.shade50,
+                        gradient: LinearGradient(
+                          colors: [Colors.red.shade50, Colors.orange.shade50],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
                         borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: Colors.red.shade200),
+                        border: Border.all(
+                          color: Colors.red.shade300,
+                          width: 2,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.red.shade100,
+                            blurRadius: 8,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
                       ),
                       child: Row(
                         children: [
-                          Icon(Icons.warning_amber, color: Colors.red.shade700),
-                          const SizedBox(width: 12),
+                          Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: Colors.red.shade100,
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Icon(
+                              Icons.warning_amber_rounded,
+                              color: Colors.red.shade700,
+                              size: 28,
+                            ),
+                          ),
+                          const SizedBox(width: 16),
                           Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 const Text(
-                                  'Stock Alerts',
-                                  style: TextStyle(fontWeight: FontWeight.bold),
+                                  '⚠️ Stock Alerts',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 15,
+                                    color: Colors.red,
+                                  ),
                                 ),
+                                const SizedBox(height: 4),
                                 if (_data!.lowStockCount > 0)
-                                  Text(
-                                    '${_data!.lowStockCount} products low on stock',
+                                  Row(
+                                    children: [
+                                      Icon(
+                                        Icons.circle,
+                                        size: 8,
+                                        color: Colors.orange.shade700,
+                                      ),
+                                      const SizedBox(width: 6),
+                                      Text(
+                                        '${_data!.lowStockCount} products low on stock',
+                                        style: const TextStyle(
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w500,
+                                          color: Colors.black87,
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 if (_data!.outOfStockCount > 0)
-                                  Text(
-                                    '${_data!.outOfStockCount} products out of stock',
+                                  Row(
+                                    children: [
+                                      Icon(
+                                        Icons.circle,
+                                        size: 8,
+                                        color: Colors.red.shade700,
+                                      ),
+                                      const SizedBox(width: 6),
+                                      Text(
+                                        '${_data!.outOfStockCount} products out of stock',
+                                        style: const TextStyle(
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w500,
+                                          color: Colors.black87,
+                                        ),
+                                      ),
+                                    ],
                                   ),
                               ],
                             ),
@@ -276,8 +392,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             },
                             style: ElevatedButton.styleFrom(
                               backgroundColor: Colors.red.shade700,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 10,
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
                             ),
-                            child: const Text('View Stock'),
+                            child: const Text(
+                              'View Stock',
+                              style: TextStyle(fontWeight: FontWeight.bold),
+                            ),
                           ),
                         ],
                       ),
@@ -292,9 +419,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withOpacity(0.3)),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -378,7 +505,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           barWidth: 3,
           belowBarData: BarAreaData(
             show: true,
-            color: Colors.green.withOpacity(0.1),
+            color: Colors.green.withValues(alpha: 0.1),
           ),
           dotData: const FlDotData(show: true),
         ),

@@ -6,6 +6,7 @@ class DashboardData {
   final double averageTicketToday;
   final int lowStockCount;
   final int outOfStockCount;
+  final int totalCustomers;
   final Map<String, double> salesByCategory;
   final List<DailySales> last7DaysSales;
   final List<TopProduct> topProducts;
@@ -18,6 +19,7 @@ class DashboardData {
     required this.averageTicketToday,
     required this.lowStockCount,
     required this.outOfStockCount,
+    required this.totalCustomers,
     required this.salesByCategory,
     required this.last7DaysSales,
     required this.topProducts,

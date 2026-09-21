@@ -1,5 +1,5 @@
-import 'package:pos_system/models/expense.dart';
-import 'package:pos_system/services/api_service.dart';
+import 'package:zite_web_pos/models/expense.dart';
+import 'package:zite_web_pos/services/api_service.dart';
 
 class ExpenseService {
   // Get all expenses
@@ -79,7 +79,20 @@ class ExpenseService {
   Future<Expense> addExpense(Expense expense) async {
     try {
       final response = await ApiService.addExpense(expense.toMap());
-      return Expense.fromMap(response);
+      print('=== BACKEND RESPONSE ===');
+      print(response);
+      print('Response keys: ${response.keys}');
+      return Expense(
+        id: response['id'],
+        date: expense.date,
+        category: expense.category,
+        amount: expense.amount,
+        description: expense.description,
+        reference: expense.reference,
+        vendor: expense.vendor,
+        paymentMethod: expense.paymentMethod,
+        createdAt: DateTime.now(),
+      );
     } catch (e) {
       print('Error adding expense via API: $e');
       rethrow;

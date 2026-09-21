@@ -1,4 +1,4 @@
-import 'package:pos_system/models/sales_report.dart';
+import 'package:zite_web_pos/models/sales_report.dart';
 
 class SalesReportService {
   // Helper to safely convert to double

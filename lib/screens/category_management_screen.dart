@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:pos_system/services/category_service.dart';
-import 'package:pos_system/models/category.dart';
-import 'package:pos_system/utils/permissions.dart';
-import 'package:pos_system/screens/unauthorized_screen.dart';
+import 'package:zite_web_pos/services/category_service.dart';
+import 'package:zite_web_pos/models/category.dart';
+import 'package:zite_web_pos/utils/permissions.dart';
+import 'package:zite_web_pos/screens/unauthorized_screen.dart';
 
 class CategoryManagementScreen extends StatefulWidget {
   const CategoryManagementScreen({super.key});
@@ -37,6 +37,8 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen> {
   void _showAddCategoryDialog() {
     final nameController = TextEditingController();
     final descController = TextEditingController();
+    final markupController = TextEditingController();
+
     bool isVatExempt = false;
 
     showDialog(
@@ -77,6 +79,19 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen> {
                     contentPadding: EdgeInsets.zero,
                     controlAffinity: ListTileControlAffinity.leading,
                   ),
+                                    const SizedBox(height: 8),
+                  TextField(
+                    controller: markupController,
+                    decoration: const InputDecoration(
+                      labelText: 'Markup % (optional)',
+                      helperText: 'Leave blank to use global default',
+                      border: OutlineInputBorder(),
+                      suffixText: '%',
+                    ),
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
+                  ),
                 ],
               ),
               actions: [
@@ -100,6 +115,9 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen> {
                           ? null
                           : descController.text,
                       isVatExempt: isVatExempt,
+                      markupPercent: markupController.text.isEmpty
+                          ? null
+                          : double.tryParse(markupController.text),
                     );
                     Navigator.pop(context);
                     _loadCategories();
@@ -125,6 +143,11 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen> {
       text: category.description ?? '',
     );
     bool isVatExempt = category.isVatExempt;
+    final markupController = TextEditingController(
+      text: category.markupPercent != null
+          ? category.markupPercent.toString()
+          : '',
+    );
 
     showDialog(
       context: context,
@@ -164,6 +187,19 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen> {
                     contentPadding: EdgeInsets.zero,
                     controlAffinity: ListTileControlAffinity.leading,
                   ),
+                  const SizedBox(height: 8),
+                    TextField(
+                      controller: markupController,
+                      decoration: const InputDecoration(
+                        labelText: 'Markup % (optional)',
+                        helperText: 'Leave blank to use global default',
+                        border: OutlineInputBorder(),
+                        suffixText: '%',
+                      ),
+                      keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true,
+                      ),
+                  ),
                 ],
               ),
               actions: [
@@ -188,6 +224,9 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen> {
                           ? null
                           : descController.text,
                       isVatExempt: isVatExempt,
+                      markupPercent: markupController.text.isEmpty
+                          ? null
+                          : double.tryParse(markupController.text),
                     );
                     Navigator.pop(context);
                     _loadCategories();
@@ -251,7 +290,7 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen> {
                   category.description!.isNotEmpty)
                 Text(category.description!),
               const SizedBox(height: 8),
-              Row(
+                            Row(
                 children: [
                   Icon(
                     category.isVatExempt ? Icons.receipt : Icons.category,
@@ -263,6 +302,29 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen> {
                     'VAT Exempt: ${category.isVatExempt ? "Yes" : "No"}',
                     style: TextStyle(
                       color: category.isVatExempt ? Colors.green : Colors.grey,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Icon(
+                    Icons.trending_up,
+                    size: 16,
+                    color: category.markupPercent != null
+                        ? Colors.blue
+                        : Colors.grey,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    category.markupPercent != null
+                        ? 'Markup: ${category.markupPercent!.toStringAsFixed(1)}%'
+                        : 'Markup: Using global default',
+                    style: TextStyle(
+                      color: category.markupPercent != null
+                          ? Colors.blue.shade700
+                          : Colors.grey,
                     ),
                   ),
                 ],
@@ -342,12 +404,24 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen> {
                       category.name,
                       style: const TextStyle(fontWeight: FontWeight.bold),
                     ),
-                    subtitle: category.description != null
-                        ? Text(
+                    subtitle: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (category.description != null)
+                          Text(
                             category.description!,
                             style: const TextStyle(fontSize: 12),
-                          )
-                        : null,
+                          ),
+                        if (category.markupPercent != null)
+                          Text(
+                            'Markup: ${category.markupPercent!.toStringAsFixed(1)}%',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: Colors.blue.shade700,
+                            ),
+                          ),
+                      ],
+                    ),
                     trailing: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [

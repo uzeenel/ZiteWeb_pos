@@ -1,5 +1,5 @@
-name: pos_system
-description: "A new Flutter project."
+name: zite_web_pos
+description: "A ZiteMart Flutter project."
 publish_to: "none"
 
 version: 1.0.0+1
@@ -14,25 +14,55 @@ dependencies:
   cupertino_icons: ^1.0.8
   sqflite: ^2.4.2
   path_provider: ^2.1.5
+  process_run: ^1.1.0
   sqflite_common_ffi: ^2.4.0+2
   path: ^1.9.1
   intl: ^0.20.2
   excel: ^4.0.6
   pdf: ^3.11.1
-  printing: ^5.13.4
+  # printing: ^5.13.4
   share_plus: ^10.1.4
-  file_picker: ^8.1.2
+  file_picker: ^8.1.4
   window_manager: ^0.3.0
   fl_chart: ^0.69.0
   bcrypt: ^1.1.1
   http: ^1.2.0
-
+  csv: ^6.0.0
+  image_picker: ^1.0.5
+  http_parser: ^4.0.2
+  cross_file: ^0.3.5
+  shared_preferences: ^2.2.2
+  basic_utils: ^5.7.0
+  pointycastle: ^3.9.1
+  url_launcher: ^6.3.2
+ 
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^6.0.0
-  
+
 flutter:
   uses-material-design: true
-
+  
+  assets:
+    - assets/fonts/
+    - assets/images/cologo.png
+  
+  fonts:
+    - family: OpenSans
+      fonts:
+        - asset: assets/fonts/OpenSans-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/OpenSans-Bold.ttf
+          weight: 700
+        - asset: assets/fonts/OpenSans-Italic.ttf
+          style: italic
+        - asset: assets/fonts/OpenSans-BoldItalic.ttf
+          weight: 700
+          style: italic
+    
+    - family: Arial
+      fonts:
+        - asset: assets/fonts/arial.ttf
+          weight: 400

@@ -1,10 +1,12 @@
-import 'package:pos_system/models/dashboard_data.dart';
-import 'package:pos_system/services/api_service.dart';
+import 'package:zite_web_pos/models/dashboard_data.dart';
+import 'package:zite_web_pos/services/api_service.dart';
 
 class DashboardService {
   Future<DashboardData> getDashboardData() async {
     try {
+      print('📊 Fetching dashboard data...');
       final data = await ApiService.getDashboard();
+      print('📊 Dashboard data received: $data');
 
       return DashboardData(
         totalSalesToday: _toDouble(data['totalSalesToday']),
@@ -14,12 +16,13 @@ class DashboardService {
         averageTicketToday: _toDouble(data['averageTicketToday']),
         lowStockCount: _toInt(data['lowStockCount']),
         outOfStockCount: _toInt(data['outOfStockCount']),
+        totalCustomers: _toInt(data['totalCustomers']),
         salesByCategory: _parseSalesByCategory(data['salesByCategory']),
         last7DaysSales: _parseLast7DaysSales(data['last7DaysSales']),
         topProducts: _parseTopProducts(data['topProducts']),
       );
     } catch (e) {
-      print('Error fetching dashboard: $e');
+      print('❌ Error fetching dashboard: $e');
       return _emptyDashboardData();
     }
   }
@@ -39,15 +42,12 @@ class DashboardService {
   List<DailySales> _parseLast7DaysSales(List? days) {
     if (days == null) return [];
 
-
     final parsed = days.map((item) {
       // Parse the ISO date string
       DateTime date;
       try {
-        // Handle format like "2026-03-26T23:00:00.000Z"
         date = DateTime.parse(item['date']);
       } catch (e) {
-        
         date = DateTime.now();
       }
 
@@ -101,6 +101,7 @@ class DashboardService {
       averageTicketToday: 0,
       lowStockCount: 0,
       outOfStockCount: 0,
+      totalCustomers: 0,
       salesByCategory: {},
       last7DaysSales: [],
       topProducts: [],

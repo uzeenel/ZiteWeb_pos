@@ -44,21 +44,38 @@ class BankTransaction {
   }
 
   factory BankTransaction.fromMap(Map<String, dynamic> map) {
+    // Safe date parser
+    DateTime parseDate(dynamic value) {
+      if (value == null) return DateTime.now();
+      if (value is DateTime) return value;
+      return DateTime.parse(value.toString());
+    }
+
+    // Safe amount parser
+    double parseAmount(dynamic value) {
+      if (value == null) return 0.0;
+      if (value is double) return value;
+      if (value is int) return value.toDouble();
+      if (value is String) return double.tryParse(value) ?? 0.0;
+      return 0.0;
+    }
+
     return BankTransaction(
       id: map['id'],
-      date: DateTime.parse(map['date']),
-      type: _stringToType(map['type']),
-      amount: map['amount'].toDouble(),
-      accountName: map['account_name'],
-      bankName: map['bank_name'],
+      date: parseDate(map['date']),
+      type: map['type'] == 'deposit'
+          ? BankTransactionType.deposit
+          : BankTransactionType.withdrawal,
+      amount: parseAmount(map['amount']),
+      accountName: map['account_name'] ?? '',
+      bankName: map['bank_name'] ?? '',
       chequeNumber: map['cheque_number'],
-      description: map['description'],
+      description: map['description'] ?? '',
       reference: map['reference'],
       userId: map['user_id'],
-      createdAt: DateTime.parse(map['created_at']),
+      createdAt: parseDate(map['created_at']),
     );
   }
-
   static String _typeToString(BankTransactionType type) {
     switch (type) {
       case BankTransactionType.deposit:

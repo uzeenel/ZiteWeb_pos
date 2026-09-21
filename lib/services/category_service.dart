@@ -1,5 +1,5 @@
-import 'package:pos_system/models/category.dart';
-import 'package:pos_system/services/api_service.dart';
+import 'package:zite_web_pos/models/category.dart';
+import 'package:zite_web_pos/services/api_service.dart';
 
 class CategoryService {
   /// Get all active categories
@@ -28,16 +28,19 @@ class CategoryService {
   }
 
   /// Add a new category
+    /// Add a new category
   Future<int> addCategory({
     required String name,
     String? description,
     bool isVatExempt = false,
+    double? markupPercent,
   }) async {
     try {
       final categoryData = {
         'name': name,
         'description': description,
         'isVatExempt': isVatExempt,
+        'markupPercent': markupPercent,
       };
 
       final result = await ApiService.addCategory(categoryData);
@@ -54,6 +57,7 @@ class CategoryService {
     required String name,
     String? description,
     bool? isVatExempt,
+    double? markupPercent,
   }) async {
     try {
       final Map<String, dynamic> categoryData = {'name': name};
@@ -65,6 +69,8 @@ class CategoryService {
       if (isVatExempt != null) {
         categoryData['isVatExempt'] = isVatExempt;
       }
+
+      categoryData['markupPercent'] = markupPercent;
 
       await ApiService.updateCategory(id, categoryData);
       return 1;

@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
-import 'package:pos_system/services/purchase_order_service.dart';
-import 'package:pos_system/services/vendor_service.dart';
-import 'package:pos_system/services/product_service.dart';
-import 'package:pos_system/services/unit_service.dart';
-import 'package:pos_system/models/vendor.dart';
-import 'package:pos_system/models/product.dart';
-import 'package:pos_system/models/unit.dart';
+import 'package:zite_web_pos/services/purchase_order_service.dart';
+import 'package:zite_web_pos/services/vendor_service.dart';
+import 'package:zite_web_pos/services/product_service.dart';
+import 'package:zite_web_pos/services/unit_service.dart';
+import 'package:zite_web_pos/models/vendor.dart';
+import 'package:zite_web_pos/models/product.dart';
+import 'package:zite_web_pos/models/unit.dart';
 import 'package:intl/intl.dart';
-import 'package:pos_system/screens/unauthorized_screen.dart';
-import 'package:pos_system/utils/permissions.dart';
+import 'package:zite_web_pos/screens/unauthorized_screen.dart';
+import 'package:zite_web_pos/utils/permissions.dart';
 
 class ReceiveStockScreen extends StatefulWidget {
   const ReceiveStockScreen({super.key});
@@ -36,9 +36,10 @@ class _ReceiveStockScreenState extends State<ReceiveStockScreen>
   late TabController _tabController;
 
   // For invoice receiving
-  List<Map<String, dynamic>> _invoiceItems = [];
+  final List<Map<String, dynamic>> _invoiceItems = [];
   Vendor? _selectedInvoiceVendor;
-  TextEditingController _invoiceNumberController = TextEditingController();
+  final TextEditingController _invoiceNumberController =
+      TextEditingController();
   DateTime _selectedInvoiceDate = DateTime.now();
 
   // Helper methods for safe type conversion
@@ -127,14 +128,12 @@ class _ReceiveStockScreenState extends State<ReceiveStockScreen>
   List<Map<String, dynamic>> get _filteredOrders {
     List<Map<String, dynamic>> filtered = _pendingOrders;
 
-    // Apply vendor filter if selected
     if (_selectedFilterVendor != null) {
       filtered = filtered
           .where((order) => order['vendor_id'] == _selectedFilterVendor!.id)
           .toList();
     }
 
-    // Apply search query filter
     if (_searchQuery.isNotEmpty) {
       filtered = filtered
           .where(
@@ -205,7 +204,6 @@ class _ReceiveStockScreenState extends State<ReceiveStockScreen>
                     ),
                     const SizedBox(height: 16),
 
-                    // Product dropdown
                     DropdownButtonFormField<Product>(
                       decoration: const InputDecoration(
                         labelText: 'Product *',
@@ -220,25 +218,10 @@ class _ReceiveStockScreenState extends State<ReceiveStockScreen>
                       items: _products.map((p) {
                         return DropdownMenuItem(
                           value: p,
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(
-                                p.name,
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.w500,
-                                ),
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                              Text(
-                                p.sku,
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  color: Colors.grey[600],
-                                ),
-                              ),
-                            ],
+                          child: Text(
+                            '${p.name} (${p.sku})',
+                            overflow: TextOverflow.ellipsis,
+                            maxLines: 1,
                           ),
                         );
                       }).toList(),
@@ -264,14 +247,12 @@ class _ReceiveStockScreenState extends State<ReceiveStockScreen>
                         }
                       },
                     ),
-
                     const SizedBox(height: 12),
 
-                    // Unit dropdown
                     if (selectedProduct != null && availableUnits.isNotEmpty)
                       DropdownButtonFormField<Unit>(
                         decoration: const InputDecoration(
-                          labelText: 'Unit *',
+                          labelText: 'Order Unit *',
                           border: OutlineInputBorder(),
                           contentPadding: EdgeInsets.symmetric(
                             horizontal: 12,
@@ -279,11 +260,16 @@ class _ReceiveStockScreenState extends State<ReceiveStockScreen>
                           ),
                         ),
                         isExpanded: true,
-                        value: selectedUnit,
-                        items: availableUnits.map((u) {
+                        initialValue: selectedUnit,
+                        hint: const Text('Select Unit for Ordering'),
+                        items: availableUnits.map((unit) {
                           return DropdownMenuItem(
-                            value: u,
-                            child: Text(u.name),
+                            value: unit,
+                            child: Text(
+                              '${unit.name} (${unit.symbol})',
+                              overflow: TextOverflow.ellipsis,
+                              maxLines: 1,
+                            ),
                           );
                         }).toList(),
                         onChanged: (value) {
@@ -295,7 +281,6 @@ class _ReceiveStockScreenState extends State<ReceiveStockScreen>
 
                     const SizedBox(height: 12),
 
-                    // Quantity field
                     TextField(
                       controller: quantityController,
                       decoration: const InputDecoration(
@@ -308,10 +293,8 @@ class _ReceiveStockScreenState extends State<ReceiveStockScreen>
                       ),
                       keyboardType: TextInputType.number,
                     ),
-
                     const SizedBox(height: 12),
 
-                    // Price field
                     TextField(
                       controller: priceController,
                       decoration: const InputDecoration(
@@ -328,7 +311,6 @@ class _ReceiveStockScreenState extends State<ReceiveStockScreen>
 
                     const SizedBox(height: 24),
 
-                    // Action buttons
                     Row(
                       mainAxisAlignment: MainAxisAlignment.end,
                       children: [
@@ -380,6 +362,8 @@ class _ReceiveStockScreenState extends State<ReceiveStockScreen>
                               'quantity': qty,
                               'unitPrice': price,
                               'total': total,
+                              'orderUnitId': selectedUnit?.id,
+                              'orderUnitName': selectedUnit?.name,
                               'unitId': selectedUnit?.id,
                               'unitName': selectedUnit?.name,
                             });
@@ -572,26 +556,54 @@ class _ReceiveStockScreenState extends State<ReceiveStockScreen>
         vendorId: _selectedInvoiceVendor!.id,
         items: _invoiceItems,
         notes: 'Date: ${DateFormat('dd/MM/yyyy').format(_selectedInvoiceDate)}',
-        invoiceNumber: _invoiceNumberController.text, // Pass invoice number
+        invoiceNumber: _invoiceNumberController.text,
       );
 
-      if (poId > 0 && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'Stock received! Invoice: ${_invoiceNumberController.text}',
-            ),
-            backgroundColor: Colors.green,
-          ),
+      if (poId > 0) {
+        final poDetails = await _poService.getPurchaseOrderDetails(poId);
+        final items = poDetails['items'] as List;
+
+        final List<Map<String, dynamic>> receivedItems = [];
+        for (var i = 0; i < items.length; i++) {
+          final poItem = items[i];
+          final originalItem = _invoiceItems[i];
+
+          receivedItems.add({
+            'id': poItem['id'],
+            'productId': poItem['product_id'],
+            'receivedQuantity': originalItem['quantity'],
+          });
+        }
+
+        final success = await _poService.receivePurchaseOrder(
+          poId,
+          receivedItems,
+          invoiceNumber: _invoiceNumberController.text,
         );
-        _resetInvoiceForm();
-        _loadData();
+
+        if (success && mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'Stock received! Invoice: ${_invoiceNumberController.text}',
+              ),
+              backgroundColor: Colors.green,
+            ),
+          );
+          _resetInvoiceForm();
+          _loadData();
+        } else if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Failed to receive stock')),
+          );
+        }
       } else if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Failed to save stock receipt')),
+          const SnackBar(content: Text('Failed to create purchase order')),
         );
       }
     } catch (e) {
+      print('Error: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -604,259 +616,6 @@ class _ReceiveStockScreenState extends State<ReceiveStockScreen>
   }
 
   final _dateFormat = DateFormat('dd/MM/yyyy');
-
-  void _showDirectPurchaseDialog() {
-    List<Map<String, dynamic>> items = [];
-    Vendor? selectedVendor;
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setState) {
-            return DraggableScrollableSheet(
-              initialChildSize: 0.95,
-              maxChildSize: 0.95,
-              minChildSize: 0.5,
-              expand: false,
-              builder: (context, scrollController) {
-                return Container(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Center(
-                        child: Container(
-                          width: 40,
-                          height: 4,
-                          decoration: BoxDecoration(
-                            color: Colors.grey.shade300,
-                            borderRadius: BorderRadius.circular(2),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      const Text(
-                        'Direct Purchase',
-                        style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-
-                      // Vendor selection with add button
-                      Row(
-                        children: [
-                          Expanded(
-                            child: DropdownButtonFormField<Vendor>(
-                              decoration: const InputDecoration(
-                                labelText: 'Vendor',
-                                border: OutlineInputBorder(),
-                              ),
-                              hint: const Text('Select Vendor'),
-                              value: selectedVendor,
-                              items: _vendors.map((v) {
-                                return DropdownMenuItem(
-                                  value: v,
-                                  child: Text(v.name),
-                                );
-                              }).toList(),
-                              onChanged: (value) {
-                                setState(() {
-                                  selectedVendor = value;
-                                });
-                              },
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          IconButton(
-                            icon: const Icon(
-                              Icons.add_circle,
-                              color: Colors.blue,
-                            ),
-                            onPressed: () {
-                              _showAddVendorDialog(setState, selectedVendor);
-                            },
-                            tooltip: 'Add New Vendor',
-                          ),
-                        ],
-                      ),
-
-                      const SizedBox(height: 16),
-
-                      // Items list header
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          const Text(
-                            'Items',
-                            style: TextStyle(fontWeight: FontWeight.bold),
-                          ),
-                          ElevatedButton.icon(
-                            onPressed: () {
-                              _showAddDirectItemDialog(items, setState);
-                            },
-                            icon: const Icon(Icons.add, size: 18),
-                            label: const Text('Add Item'),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.blue,
-                            ),
-                          ),
-                        ],
-                      ),
-
-                      const SizedBox(height: 8),
-
-                      // Items list
-                      Expanded(
-                        child: items.isEmpty
-                            ? const Center(child: Text('No items added'))
-                            : ListView.builder(
-                                controller: scrollController,
-                                itemCount: items.length,
-                                itemBuilder: (context, index) {
-                                  final item = items[index];
-                                  return Card(
-                                    margin: const EdgeInsets.only(bottom: 8),
-                                    child: ListTile(
-                                      title: Text(item['productName']),
-                                      subtitle: Text(
-                                        'Qty: ${_formatQuantity(item['quantity'])} × ₦${_toDouble(item['unitPrice']).toStringAsFixed(2)} = ₦${_toDouble(item['total']).toStringAsFixed(2)}',
-                                      ),
-                                      trailing: IconButton(
-                                        icon: const Icon(
-                                          Icons.delete,
-                                          color: Colors.red,
-                                        ),
-                                        onPressed: () {
-                                          setState(() {
-                                            items.removeAt(index);
-                                          });
-                                        },
-                                      ),
-                                    ),
-                                  );
-                                },
-                              ),
-                      ),
-
-                      const Divider(),
-
-                      // Totals
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          const Text(
-                            'Subtotal:',
-                            style: TextStyle(fontSize: 14),
-                          ),
-                          Text(
-                            '₦${_calculateSubtotal(items).toStringAsFixed(2)}',
-                          ),
-                        ],
-                      ),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          const Text(
-                            'VAT (7.5%):',
-                            style: TextStyle(fontSize: 14),
-                          ),
-                          Text('₦${_calculateVat(items).toStringAsFixed(2)}'),
-                        ],
-                      ),
-                      const Divider(),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          const Text(
-                            'Total:',
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 16,
-                            ),
-                          ),
-                          Text(
-                            '₦${_calculateTotal(items).toStringAsFixed(2)}',
-                            style: const TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 16,
-                              color: Colors.green,
-                            ),
-                          ),
-                        ],
-                      ),
-
-                      const SizedBox(height: 16),
-
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          TextButton(
-                            onPressed: () => Navigator.pop(context),
-                            child: const Text('Cancel'),
-                          ),
-                          ElevatedButton(
-                            onPressed: items.isEmpty || selectedVendor == null
-                                ? null
-                                : () async {
-                                    try {
-                                      final poId = await _poService
-                                          .createDirectPurchaseOrder(
-                                            vendorId: selectedVendor!.id,
-                                            items: items,
-                                            notes: 'Direct Purchase',
-                                          );
-                                      if (poId > 0 && mounted) {
-                                        ScaffoldMessenger.of(
-                                          context,
-                                        ).showSnackBar(
-                                          const SnackBar(
-                                            content: Text(
-                                              'Direct purchase saved!',
-                                            ),
-                                            backgroundColor: Colors.green,
-                                          ),
-                                        );
-                                      }
-                                      if (mounted) {
-                                        Navigator.pop(context);
-                                        _loadData();
-                                      }
-                                    } catch (e) {
-                                      if (mounted) {
-                                        ScaffoldMessenger.of(
-                                          context,
-                                        ).showSnackBar(
-                                          SnackBar(
-                                            content: Text(
-                                              'Error: ${e.toString()}',
-                                            ),
-                                            backgroundColor: Colors.red,
-                                          ),
-                                        );
-                                      }
-                                    }
-                                  },
-                            child: const Text('Save & Receive Stock'),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                );
-              },
-            );
-          },
-        );
-      },
-    );
-  }
 
   void _showReceiveDialog(Map<String, dynamic> order) async {
     try {
@@ -875,7 +634,6 @@ class _ReceiveStockScreenState extends State<ReceiveStockScreen>
       final orderData = details['order'];
       final items = List<Map<String, dynamic>>.from(details['items']);
 
-      // Controller for supplier invoice number
       final invoiceNumberController = TextEditingController();
 
       List<Map<String, dynamic>> modifiableItems = [];
@@ -929,7 +687,6 @@ class _ReceiveStockScreenState extends State<ReceiveStockScreen>
                         ),
                         const SizedBox(height: 16),
 
-                        // PO Information Card
                         Card(
                           color: Colors.blue.shade50,
                           child: Padding(
@@ -956,7 +713,6 @@ class _ReceiveStockScreenState extends State<ReceiveStockScreen>
 
                         const SizedBox(height: 16),
 
-                        // Supplier Invoice Number Field (Optional)
                         Card(
                           child: Padding(
                             padding: const EdgeInsets.all(12),
@@ -991,7 +747,6 @@ class _ReceiveStockScreenState extends State<ReceiveStockScreen>
 
                         const SizedBox(height: 16),
 
-                        // Items Header
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
@@ -1013,7 +768,6 @@ class _ReceiveStockScreenState extends State<ReceiveStockScreen>
                         ),
                         const Divider(height: 24),
 
-                        // Items List
                         Expanded(
                           child: ListView.builder(
                             controller: scrollController,
@@ -1225,7 +979,6 @@ class _ReceiveStockScreenState extends State<ReceiveStockScreen>
                         const Divider(),
                         const SizedBox(height: 8),
 
-                        // Action Buttons
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
@@ -1271,7 +1024,6 @@ class _ReceiveStockScreenState extends State<ReceiveStockScreen>
                                   ),
                                 );
 
-                                // Pass the invoice number to the service
                                 final success = await _poService
                                     .receivePurchaseOrder(
                                       order['id'],
@@ -1285,10 +1037,8 @@ class _ReceiveStockScreenState extends State<ReceiveStockScreen>
                                     );
 
                                 if (mounted) {
-                                  Navigator.pop(
-                                    context,
-                                  ); // Close loading dialog
-                                  Navigator.pop(context); // Close bottom sheet
+                                  Navigator.pop(context);
+                                  Navigator.pop(context);
                                 }
 
                                 if (success && mounted) {
@@ -1302,7 +1052,7 @@ class _ReceiveStockScreenState extends State<ReceiveStockScreen>
                                       backgroundColor: Colors.green,
                                     ),
                                   );
-                                  _loadData(); // Refresh the list
+                                  _loadData();
                                 } else if (mounted) {
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     const SnackBar(
@@ -1365,10 +1115,9 @@ class _ReceiveStockScreenState extends State<ReceiveStockScreen>
       body: TabBarView(
         controller: _tabController,
         children: [
-          // Tab 1: Purchase Orders with Vendor Filter
+          // Tab 1: Purchase Orders
           Column(
             children: [
-              // Vendor filter row
               Padding(
                 padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
                 child: Row(
@@ -1386,7 +1135,7 @@ class _ReceiveStockScreenState extends State<ReceiveStockScreen>
                             vertical: 8,
                           ),
                         ),
-                        value: _selectedFilterVendor,
+                        initialValue: _selectedFilterVendor,
                         hint: const Text('All Vendors'),
                         items: [
                           const DropdownMenuItem<Vendor>(
@@ -1398,7 +1147,7 @@ class _ReceiveStockScreenState extends State<ReceiveStockScreen>
                               value: v,
                               child: Text(v.name),
                             );
-                          }).toList(),
+                          }),
                         ],
                         onChanged: (value) {
                           setState(() {
@@ -1421,7 +1170,6 @@ class _ReceiveStockScreenState extends State<ReceiveStockScreen>
                   ],
                 ),
               ),
-              // Search field
               Padding(
                 padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
                 child: TextField(
@@ -1524,7 +1272,7 @@ class _ReceiveStockScreenState extends State<ReceiveStockScreen>
             ],
           ),
 
-          // Tab 2: Receive by Invoice
+          // Tab 2: Receive by Invoice - WITH HORIZONTAL ITEMS LAYOUT
           SingleChildScrollView(
             padding: const EdgeInsets.all(16),
             child: Column(
@@ -1608,7 +1356,7 @@ class _ReceiveStockScreenState extends State<ReceiveStockScreen>
                             border: OutlineInputBorder(),
                             prefixIcon: Icon(Icons.business),
                           ),
-                          value: _selectedInvoiceVendor,
+                          initialValue: _selectedInvoiceVendor,
                           items: _vendors.map((v) {
                             return DropdownMenuItem(
                               value: v,
@@ -1627,7 +1375,7 @@ class _ReceiveStockScreenState extends State<ReceiveStockScreen>
                 ),
                 const SizedBox(height: 16),
 
-                // Items Section
+                // Items Section - HORIZONTAL LAYOUT
                 Card(
                   child: Padding(
                     padding: const EdgeInsets.all(16),
@@ -1659,6 +1407,7 @@ class _ReceiveStockScreenState extends State<ReceiveStockScreen>
                           ],
                         ),
                         const SizedBox(height: 16),
+
                         if (_invoiceItems.isEmpty)
                           const Center(
                             child: Padding(
@@ -1669,34 +1418,131 @@ class _ReceiveStockScreenState extends State<ReceiveStockScreen>
                             ),
                           )
                         else
-                          ListView.builder(
-                            shrinkWrap: true,
-                            physics: const NeverScrollableScrollPhysics(),
-                            itemCount: _invoiceItems.length,
-                            itemBuilder: (context, index) {
-                              final item = _invoiceItems[index];
-                              return Card(
-                                margin: const EdgeInsets.only(bottom: 8),
-                                child: ListTile(
-                                  title: Text(item['productName']),
-                                  subtitle: Text(
-                                    'Qty: ${_formatQuantity(item['quantity'])} × ₦${_toDouble(item['unitPrice']).toStringAsFixed(2)}',
-                                  ),
-                                  trailing: IconButton(
-                                    icon: const Icon(
-                                      Icons.delete,
-                                      color: Colors.red,
+                          // HORIZONTAL SCROLLABLE LIST
+                          SizedBox(
+                            height: 130,
+                            child: ListView.builder(
+                              scrollDirection: Axis.horizontal,
+                              itemCount: _invoiceItems.length,
+                              itemBuilder: (context, index) {
+                                final item = _invoiceItems[index];
+                                return Container(
+                                  width: 260,
+                                  margin: const EdgeInsets.only(right: 12),
+                                  child: Card(
+                                    elevation: 2,
+                                    color: Colors.blue.shade50,
+                                    child: Padding(
+                                      padding: const EdgeInsets.all(12),
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Row(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              Expanded(
+                                                child: Column(
+                                                  crossAxisAlignment:
+                                                      CrossAxisAlignment.start,
+                                                  children: [
+                                                    Text(
+                                                      item['productName'],
+                                                      style: const TextStyle(
+                                                        fontWeight:
+                                                            FontWeight.bold,
+                                                        fontSize: 13,
+                                                      ),
+                                                      maxLines: 2,
+                                                      overflow:
+                                                          TextOverflow.ellipsis,
+                                                    ),
+                                                    Text(
+                                                      'SKU: ${item['productSku']}',
+                                                      style: TextStyle(
+                                                        fontSize: 10,
+                                                        color: Colors.grey[600],
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                              IconButton(
+                                                icon: const Icon(
+                                                  Icons.delete,
+                                                  color: Colors.red,
+                                                  size: 18,
+                                                ),
+                                                onPressed: () {
+                                                  setState(() {
+                                                    _invoiceItems.removeAt(
+                                                      index,
+                                                    );
+                                                  });
+                                                },
+                                                padding: EdgeInsets.zero,
+                                                constraints:
+                                                    const BoxConstraints(),
+                                              ),
+                                            ],
+                                          ),
+                                          const SizedBox(height: 8),
+                                          Row(
+                                            mainAxisAlignment:
+                                                MainAxisAlignment.spaceBetween,
+                                            children: [
+                                              Column(
+                                                crossAxisAlignment:
+                                                    CrossAxisAlignment.start,
+                                                children: [
+                                                  Text(
+                                                    'Qty: ${_formatQuantity(item['quantity'])}',
+                                                    style: const TextStyle(
+                                                      fontSize: 11,
+                                                    ),
+                                                  ),
+                                                  Text(
+                                                    'Unit: ${item['unitName'] ?? '-'}',
+                                                    style: const TextStyle(
+                                                      fontSize: 11,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                              Column(
+                                                crossAxisAlignment:
+                                                    CrossAxisAlignment.end,
+                                                children: [
+                                                  Text(
+                                                    '₦${_toDouble(item['unitPrice']).toStringAsFixed(2)}',
+                                                    style: const TextStyle(
+                                                      fontSize: 11,
+                                                    ),
+                                                  ),
+                                                  Text(
+                                                    'Total: ₦${_toDouble(item['total']).toStringAsFixed(2)}',
+                                                    style: const TextStyle(
+                                                      fontWeight:
+                                                          FontWeight.bold,
+                                                      fontSize: 12,
+                                                      color: Colors.green,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ],
+                                          ),
+                                        ],
+                                      ),
                                     ),
-                                    onPressed: () {
-                                      setState(() {
-                                        _invoiceItems.removeAt(index);
-                                      });
-                                    },
                                   ),
-                                ),
-                              );
-                            },
+                                );
+                              },
+                            ),
                           ),
+
                         const Divider(),
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,

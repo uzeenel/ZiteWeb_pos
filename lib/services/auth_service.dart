@@ -1,5 +1,6 @@
-import 'package:pos_system/models/user.dart';
-import 'package:pos_system/services/api_service.dart';
+import 'package:zite_web_pos/models/user.dart';
+import 'package:zite_web_pos/services/api_service.dart';
+import 'package:zite_web_pos/utils/permissions.dart';
 
 class AuthService {
   static final AuthService _instance = AuthService._internal();
@@ -8,12 +9,17 @@ class AuthService {
 
   Future<bool> login(String username, String password) async {
     final result = await ApiService.login(username, password);
-    // Force refresh of currentUser reference
+    if (result) {
+      // Load this user's permissions and make them available app-wide
+      final perms = await ApiService.getMyPermissions();
+      Permissions.setPermissions(perms);
+    }
     return result;
   }
 
   Future<void> logout() async {
     await ApiService.logout();
+    Permissions.clear();
   }
 
   User? get currentUser => ApiService.currentUser;
@@ -26,7 +32,6 @@ class AuthService {
 
   // These methods will need API endpoints - we'll add them later
   Future<List<User>> getAllUsers() async {
-    // TODO: Implement after adding user management endpoints
     return [];
   }
 
@@ -36,20 +41,14 @@ class AuthService {
     required String fullName,
     required UserRole role,
   }) async {
-    // TODO: Implement after adding user management endpoints
     throw UnimplementedError();
   }
 
-  Future<void> toggleUserActive(int userId) async {
-    // TODO: Implement after adding user management endpoints
-  }
+  Future<void> toggleUserActive(int userId) async {}
 
-  Future<void> deleteUser(int userId) async {
-    // TODO: Implement after adding user management endpoints
-  }
+  Future<void> deleteUser(int userId) async {}
 
   Future<User?> getUser(int userId) async {
-    // TODO: Implement after adding user management endpoints
     return null;
   }
 }
