@@ -8,7 +8,7 @@ import 'package:zite_web_pos/models/cart_item.dart';
 import 'package:zite_web_pos/models/sales_return.dart';
 
 class ApiService {
-  static const String baseUrl = 'http://localhost:3000/api';
+  static const String baseUrl = 'https://zitemart-api.onrender.com/api';
   static String? _token;
   static User? _currentUser;
 

@@ -89,3 +89,6 @@ license_public.pem
 # VS Code
 .vscode/
 lib/importantFile
+
+# Local Netlify folder
+.netlify
