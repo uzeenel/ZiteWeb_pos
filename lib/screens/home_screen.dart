@@ -100,20 +100,50 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  @override
+    @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: Row(
-        children: [
-          Sidebar(
-            selectedIndex: _selectedIndex,
-            onItemSelected: _onItemSelected,
-            onToggleTheme: widget.onToggleTheme,
-            onLogout: _logout,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // If the screen is wider than 800 pixels, it's a desktop/tablet.
+        // If it's narrower, it's a mobile phone.
+        final isMobile = constraints.maxWidth < 800;
+
+        if (isMobile) {
+          return Scaffold(
+            appBar: AppBar(
+              title: const Text('ZiteMart POS'),
+              // The drawer automatically gets the hamburger menu icon
+            ),
+            drawer: Drawer(
+              child: Sidebar(
+                selectedIndex: _selectedIndex,
+                onItemSelected: (index) {
+                  _onItemSelected(index);
+                  Navigator.pop(context); // Close the drawer after selection
+                },
+                onToggleTheme: widget.onToggleTheme,
+                onLogout: _logout,
+              ),
+            ),
+            body: _screens[_selectedIndex],
+          );
+        }
+
+        // Desktop layout (original)
+        return Scaffold(
+          body: Row(
+            children: [
+              Sidebar(
+                selectedIndex: _selectedIndex,
+                onItemSelected: _onItemSelected,
+                onToggleTheme: widget.onToggleTheme,
+                onLogout: _logout,
+              ),
+              Expanded(child: _screens[_selectedIndex]),
+            ],
           ),
-          Expanded(child: _screens[_selectedIndex]),
-        ],
-      ),
+        );
+      },
     );
   }
 }
