@@ -1231,13 +1231,25 @@ class _ProductManagementScreenState extends State<ProductManagementScreen> {
                             product.name,
                             style: const TextStyle(fontWeight: FontWeight.bold),
                           ),
-                          subtitle: Column(
+                                                    subtitle: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
+                              const SizedBox(height: 4),
                               Text(
-                                'SKU: ${product.sku} | Price: ₦${product.sellingPrice.toStringAsFixed(0)}${unit.symbol.isNotEmpty ? ' | Unit: ${unit.symbol}' : ''} | Stock: ${product.stockQuantity.toStringAsFixed(0)}',
+                                'SKU: ${product.sku}',
+                                style: const TextStyle(fontSize: 12),
+                              ),
+                              Text(
+                                'Price: ₦${product.sellingPrice.toStringAsFixed(0)}${unit.symbol.isNotEmpty ? ' / ${unit.symbol}' : ''}',
+                                style: const TextStyle(fontSize: 12),
+                              ),
+                              Text(
+                                'Stock: ${product.stockQuantity.toStringAsFixed(0)}',
                                 style: TextStyle(
                                   fontSize: 12,
+                                  fontWeight: isLowStock
+                                      ? FontWeight.bold
+                                      : FontWeight.normal,
                                   color: isLowStock
                                       ? Colors.red.shade700
                                       : Colors.grey.shade600,

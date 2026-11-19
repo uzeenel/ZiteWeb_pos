@@ -233,77 +233,193 @@ class _DiscountPinReportScreenState extends State<DiscountPinReportScreen> {
               ],
             ),
           ),
-          // Body
+                    // Body
           Expanded(
             child: _isLoading
                 ? const Center(child: CircularProgressIndicator())
                 : _filtered.isEmpty
                 ? const Center(child: Text('No PINs found'))
-                : SingleChildScrollView(
-                    scrollDirection: Axis.vertical,
-                    child: SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      child: DataTable(
-                        columns: const [
-                          DataColumn(label: Text('PIN')),
-                          DataColumn(label: Text('Max')),
-                          DataColumn(label: Text('Status')),
-                          DataColumn(label: Text('Created by')),
-                          DataColumn(label: Text('Created at')),
-                          DataColumn(label: Text('Used by')),
-                          DataColumn(label: Text('Used at')),
-                          DataColumn(label: Text('Applied')),
-                          DataColumn(label: Text('Sale')),
-                          DataColumn(label: Text('Notes')),
-                        ],
-                        rows: _filtered.map((p) {
-                          final maxType = p['max_discount_type'];
-                          final maxVal = p['max_discount_value'];
-                          final maxLabel = maxType == 'percent'
-                              ? '$maxVal%'
-                              : '₦$maxVal';
-                          final createdAt = p['created_at'] != null
-                              ? DateFormat('dd/MM/yy HH:mm').format(
-                                  DateTime.parse(p['created_at']).toLocal(),
-                                )
-                              : '-';
-                          final usedAt = p['used_at'] != null
-                              ? DateFormat(
-                                  'dd/MM/yy HH:mm',
-                                ).format(DateTime.parse(p['used_at']).toLocal())
-                              : '-';
+                : LayoutBuilder(
+                    builder: (context, constraints) {
+                      final isMobile = constraints.maxWidth < 700;
 
-                          return DataRow(
-                            cells: [
-                              DataCell(
-                                Text(
-                                  p['pin'].toString(),
-                                  style: const TextStyle(
-                                    fontFamily: 'monospace',
-                                    fontWeight: FontWeight.bold,
+                      if (isMobile) {
+                        // ---- Mobile: vertical card list ----
+                        return ListView.builder(
+                          itemCount: _filtered.length,
+                          itemBuilder: (context, index) {
+                            final p = _filtered[index];
+                            final maxType = p['max_discount_type'];
+                            final maxVal = p['max_discount_value'];
+                            final maxLabel = maxType == 'percent'
+                                ? '$maxVal%'
+                                : '₦$maxVal';
+                            final createdAt = p['created_at'] != null
+                                ? DateFormat('dd/MM/yy HH:mm').format(
+                                    DateTime.parse(p['created_at']).toLocal(),
+                                  )
+                                : '-';
+                            final usedAt = p['used_at'] != null
+                                ? DateFormat('dd/MM/yy HH:mm').format(
+                                    DateTime.parse(p['used_at']).toLocal(),
+                                  )
+                                : '-';
+
+                            Widget row(String label, Widget value) => Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 2,
                                   ),
+                                  child: Row(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      SizedBox(
+                                        width: 90,
+                                        child: Text(
+                                          label,
+                                          style: const TextStyle(
+                                            fontSize: 12,
+                                            color: Colors.grey,
+                                          ),
+                                        ),
+                                      ),
+                                      Expanded(child: value),
+                                    ],
+                                  ),
+                                );
+
+                            return Card(
+                              margin: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 6,
+                              ),
+                              child: Padding(
+                                padding: const EdgeInsets.all(12),
+                                child: Column(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        Text(
+                                          p['pin'].toString(),
+                                          style: const TextStyle(
+                                            fontFamily: 'monospace',
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 16,
+                                          ),
+                                        ),
+                                        _statusChip(p),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 8),
+                                    row('Max', Text(maxLabel)),
+                                    row(
+                                      'Created by',
+                                      Text(p['created_by_username'] ?? '-'),
+                                    ),
+                                    row('Created at', Text(createdAt)),
+                                    row(
+                                      'Used by',
+                                      Text(p['used_by_username'] ?? '-'),
+                                    ),
+                                    row('Used at', Text(usedAt)),
+                                    row(
+                                      'Applied',
+                                      Text(
+                                        p['discount_applied'] != null
+                                            ? '₦${p['discount_applied']}'
+                                            : '-',
+                                      ),
+                                    ),
+                                    row(
+                                      'Sale',
+                                      Text(p['sale_invoice'] ?? '-'),
+                                    ),
+                                    row('Notes', Text(p['notes'] ?? '-')),
+                                  ],
                                 ),
                               ),
-                              DataCell(Text(maxLabel)),
-                              DataCell(_statusChip(p)),
-                              DataCell(Text(p['created_by_username'] ?? '-')),
-                              DataCell(Text(createdAt)),
-                              DataCell(Text(p['used_by_username'] ?? '-')),
-                              DataCell(Text(usedAt)),
-                              DataCell(
-                                Text(
-                                  p['discount_applied'] != null
-                                      ? '₦${p['discount_applied']}'
-                                      : '-',
-                                ),
-                              ),
-                              DataCell(Text(p['sale_invoice'] ?? '-')),
-                              DataCell(Text(p['notes'] ?? '-')),
+                            );
+                          },
+                        );
+                      }
+
+                      // ---- Desktop: original table ----
+                      return SingleChildScrollView(
+                        scrollDirection: Axis.vertical,
+                        child: SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          child: DataTable(
+                            columns: const [
+                              DataColumn(label: Text('PIN')),
+                              DataColumn(label: Text('Max')),
+                              DataColumn(label: Text('Status')),
+                              DataColumn(label: Text('Created by')),
+                              DataColumn(label: Text('Created at')),
+                              DataColumn(label: Text('Used by')),
+                              DataColumn(label: Text('Used at')),
+                              DataColumn(label: Text('Applied')),
+                              DataColumn(label: Text('Sale')),
+                              DataColumn(label: Text('Notes')),
                             ],
-                          );
-                        }).toList(),
-                      ),
-                    ),
+                            rows: _filtered.map((p) {
+                              final maxType = p['max_discount_type'];
+                              final maxVal = p['max_discount_value'];
+                              final maxLabel = maxType == 'percent'
+                                  ? '$maxVal%'
+                                  : '₦$maxVal';
+                              final createdAt = p['created_at'] != null
+                                  ? DateFormat('dd/MM/yy HH:mm').format(
+                                      DateTime.parse(p['created_at'])
+                                          .toLocal(),
+                                    )
+                                  : '-';
+                              final usedAt = p['used_at'] != null
+                                  ? DateFormat('dd/MM/yy HH:mm').format(
+                                      DateTime.parse(p['used_at']).toLocal(),
+                                    )
+                                  : '-';
+
+                              return DataRow(
+                                cells: [
+                                  DataCell(
+                                    Text(
+                                      p['pin'].toString(),
+                                      style: const TextStyle(
+                                        fontFamily: 'monospace',
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                                  DataCell(Text(maxLabel)),
+                                  DataCell(_statusChip(p)),
+                                  DataCell(
+                                    Text(p['created_by_username'] ?? '-'),
+                                  ),
+                                  DataCell(Text(createdAt)),
+                                  DataCell(
+                                    Text(p['used_by_username'] ?? '-'),
+                                  ),
+                                  DataCell(Text(usedAt)),
+                                  DataCell(
+                                    Text(
+                                      p['discount_applied'] != null
+                                          ? '₦${p['discount_applied']}'
+                                          : '-',
+                                    ),
+                                  ),
+                                  DataCell(Text(p['sale_invoice'] ?? '-')),
+                                  DataCell(Text(p['notes'] ?? '-')),
+                                ],
+                              );
+                            }).toList(),
+                          ),
+                        ),
+                      );
+                    },
                   ),
           ),
         ],

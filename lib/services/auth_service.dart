@@ -7,8 +7,8 @@ class AuthService {
   factory AuthService() => _instance;
   AuthService._internal();
 
-  Future<bool> login(String username, String password) async {
-    final result = await ApiService.login(username, password);
+  Future<bool> login(String username, String password, String tenantSlug) async {
+    final result = await ApiService.login(username, password, tenantSlug);
     if (result) {
       // Load this user's permissions and make them available app-wide
       final perms = await ApiService.getMyPermissions();

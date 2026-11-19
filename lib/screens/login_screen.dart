@@ -12,6 +12,9 @@ class _LoginScreenState extends State<LoginScreen> {
   final AuthService _authService = AuthService();
   final TextEditingController _usernameController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
+  final TextEditingController _tenantController = TextEditingController(
+    text: 'demo',
+  );
   bool _isLoading = false;
   bool _obscurePassword = true;
 
@@ -22,8 +25,9 @@ class _LoginScreenState extends State<LoginScreen> {
 
     final username = _usernameController.text.trim();
     final password = _passwordController.text.trim();
+    final tenantSlug = _tenantController.text.trim().toLowerCase();
 
-    final success = await _authService.login(username, password);
+    final success = await _authService.login(username, password, tenantSlug);
 
     setState(() {
       _isLoading = false;
@@ -40,8 +44,6 @@ class _LoginScreenState extends State<LoginScreen> {
       );
     }
   }
-
-
 
   @override
   Widget build(BuildContext context) {
@@ -82,6 +84,25 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                   ),
                   const SizedBox(height: 32),
+                  TextField(
+                    controller: _tenantController,
+                    style: const TextStyle(color: Colors.white),
+                    cursorColor: Colors.white,
+                    decoration: const InputDecoration(
+                      labelText: 'Business Code',
+                      prefixIcon: Icon(Icons.business),
+                      labelStyle: TextStyle(color: Colors.white30),
+                      border: OutlineInputBorder(),
+                      enabledBorder: OutlineInputBorder(
+                        borderSide: BorderSide(color: Colors.white30),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderSide: BorderSide(color: Colors.yellow),
+                      ),
+                    ),
+                    onSubmitted: (_) => _login(),
+                  ),
+                  const SizedBox(height: 16),
                   TextField(
                     controller: _usernameController,
                     style: const TextStyle(color: Colors.white),

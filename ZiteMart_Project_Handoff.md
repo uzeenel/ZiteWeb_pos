@@ -1,6 +1,6 @@
 # ZiteMart POS — Project Handoff Document
 
-Last updated: 2026-09-21
+Last updated: 2026-11-16
 Purpose: Context for continuing work in a new chat session.
 
 ---
@@ -39,11 +39,29 @@ The desktop and web projects have separate `pubspec.yaml` package names:
 
 ## 3. Stack
 
-- **Frontend:** Flutter 3.44.x (stable channel)
-- **Backend:** Node.js, Express, mysql2
-- **Database:** MySQL 8
+Two database backends coexist in the same repo, selected by entry point:
+
+- **Desktop edition** — `server.js` + `mysql2` + local MySQL 8 on the
+  client's laptop.
+- **Cloud edition** — `server-pg.js` + `pg` + PostgreSQL (Neon) in the
+  cloud. This is the canonical path for all active/new work.
+
+Shared:
+- **Frontend:** Flutter 3.44.x (stable channel), web and Windows targets
+- **Backend:** Node.js, Express 5
 - **Auth:** JWT (8-hour expiry), bcrypt password hashing
+- **Cloud hosting:** Flutter web on Netlify (`zite.chowexpress.co`),
+  Node backend on Render (`zitemart-api.onrender.com`)
 - **Dev environment:** Windows, VS Code, Git Bash
+
+Env files in `~/pos_server`:
+- `.env`     — MySQL creds (desktop edition)
+- `.env.pg`  — Postgres creds (cloud edition); loaded first by
+  `server-pg.js` via `dotenv.config({ path: '.env.pg', override: true })`,
+  with `.env` as fallback.
+
+`package.json` `start` script runs `node server-pg.js`, so **Render
+deploys the Postgres backend**, not `server.js`.
 
 ---
 
@@ -60,10 +78,15 @@ ZiteWeb_POS/
 ├── web/
 ├── pubspec.yaml ← name: zite_web_pos
 └── build/web/ ← output of flutter build web --release
+    (deployed to Netlify via app.netlify.com/drop — the CLI link has been
+     unreliable; see §9)
 
 pos_server/
-├── server.js ← ~3100 lines, all routes
-├── .env ← DB credentials, port, JWT secret
+├── server-pg.js ← CLOUD edition backend (Postgres). Render runs this.
+├── server.js ← DESKTOP edition backend (MySQL). Do not add cloud
+│ features here.
+├── .env ← MySQL creds (desktop edition)
+├── .env.pg ← Postgres creds (cloud edition); loaded first by server-pg.js
 ├── node_modules/
 ├── uploads/
 │ └── logos/ ← company logo files
@@ -71,7 +94,12 @@ pos_server/
 ├── license_public.pem
 ├── make_license.js
 ├── verify_license.js
-└── package.json
+├── migrate_to_neon.js ← one-off MySQL → Neon Postgres migration script
+├── hash.js
+├── test-connection.js
+├── test-db.js
+├── test-login.js
+└── package.json ← "start": "node server-pg.js"
 
 text
 
@@ -171,11 +199,17 @@ text
 - Backup download (SQL file)
 
 ### Known gaps on web
-- **Database restore** — not available in web UI. Must be done server-side
-  via `mysql -u admin -p pos_system < backup.sql`. Deliberate.
-- **Product image upload** — untested on web; may break
-- **Company logo upload** — untested on web; may break
-- **License check** — disabled entirely on web
+- **Database restore** — not available in web UI. Must be done server-side.
+  Cloud edition is Postgres (Neon), so the command is now
+  `psql "$DATABASE_URL" < backup.sql`, not `mysql`. Deliberate.
+- **Product image upload** — still untested on web
+- **Company logo upload** — still untested on web
+- **License check** — disabled entirely on web (subscription billing will
+  replace it in the SaaS edition — see §15)
+- **Mobile responsiveness** — partially done. `home_screen.dart` now uses
+  `LayoutBuilder` to swap the fixed sidebar for a `Drawer` under 800px.
+  Screens that render wide `DataTable`s still need a mobile card layout;
+  `discount_pin_report_screen.dart` is the known offender.
 
 ### Filesystem-related: on web, `path_provider`, `dart:io`, and file writes
 don't work. Any screen using them needs an HTML blob download approach
@@ -189,6 +223,18 @@ Auth:
 - POST /api/login
 - GET /api/test
 - GET /api/my-permissions
+
+Users:
+- GET    /api/users          (list; added in commit 2c28b8a — was missing,
+                               caused 404 on Users page)
+- GET    /api/users/:id
+- POST   /api/users          (single route; duplicate removed in 2c28b8a;
+                              now looks up role_id from roles.name so
+                              new users get correct permissions)
+- PUT    /api/users/:id
+- PATCH  /api/users/:id/password
+- PATCH  /api/users/:id/toggle
+- DELETE /api/users/:id
 
 Products:
 - GET /api/products
@@ -236,7 +282,7 @@ Backup:
 - POST /api/backup/import (stub)
 - POST /api/backup/restore (stub)
 
-Plus routes for users, customers, vendors, units, purchase orders,
+Plus routes for customers, vendors, units, purchase orders,
 vendor payments, invoices, stock movements, cash book, bank book,
 expenses, sales returns, credit sales, notifications, banks, bank accounts,
 credit payments, layaway.
@@ -251,12 +297,21 @@ credit payments, layaway.
 - To update: copy `build/windows/x64/runner/Release/*` to `C:\ZiteMart\`
   and `server.js` to `C:\pos_server\`, then `net stop POSServer && net start POSServer`
 
-### Web edition
-- **Not deployed.** Currently only runs on the dev machine.
-- `flutter build web --release` produces `build/web/`
-- To serve: `server.js` needs `app.use(express.static('web'))` added,
-  and `build/web/*` copied into `pos_server/web/`
-- Deployment target not yet chosen (Render, Railway, etc.)
+### Web edition — DEPLOYED
+- **Live:** https://zite.chowexpress.co (Netlify, custom domain,
+  SSL via Netlify-managed cert)
+- **Backend API:** https://zitemart-api.onrender.com (Render,
+  runs `node server-pg.js`)
+- **Database:** Neon PostgreSQL (`DB_*` in `.env.pg`; on Render set as
+  environment variables)
+- **Build:** `flutter build web --release` in `~/Desktop/ZiteWeb_POS`
+  produces `build/web/`
+- **Deploy:** Netlify Drop (https://app.netlify.com/drop) — drag
+  `build/web` folder. The Netlify CLI is linked but unreliable
+  (`JSONHTTPError: Not Found` after rebuilds); prefer Drop until GitHub
+  auto-deploy is wired up.
+- **TODO:** connect Netlify to the GitHub repo so `git push` auto-deploys,
+  removing the manual drag-and-drop step.
 
 ---
 
@@ -286,10 +341,21 @@ credit payments, layaway.
 
 ## 11. Key design decisions already made
 
-- **Multi-tenancy:** not decided. Likely one cloud deployment per client
-  initially, with possible multi-tenancy later.
-- **Cloud provider:** leaning Render (already used for other projects).
-- **Mobile app:** separate Flutter project, oversight-only.
+- **Multi-tenancy:** DECIDED — true multi-tenancy. One cloud deployment,
+  many tenants, row-isolated via `tenant_id` + PostgreSQL Row-Level
+  Security (RLS). See §15 for the roadmap.
+- **Database (cloud):** PostgreSQL (Neon) only. `server-pg.js` is
+  canonical. `server.js`/MySQL is desktop-only and gets no SaaS features.
+- **Cloud provider:** Render (backend, already live at
+  `zitemart-api.onrender.com`) + Netlify (frontend, live at
+  `zite.chowexpress.co`).
+- **Billing:** Paystack subscriptions, one plan per tenant. Replaces the
+  RSA license-key system in the cloud edition.
+- **Licensing:** RSA license files remain for the desktop edition only.
+  Disabled on web and will not be used for SaaS.
+- **Mobile app:** separate Flutter project, oversight-only, deferred
+  until SaaS + Paystack is complete. JWT must carry `tenant_id` now so
+  the mobile app works without a rewrite later.
 - **Approval model:** replaces PIN system in cloud edition. PINs remain
   in the offline edition.
 - **VAT:** global switch with per-product and per-category exemption.
@@ -337,3 +403,48 @@ short.
 
 When asking about a specific screen, paste that screen's current file.
 Don't assume I remember it from a previous session.
+
+
+
+---
+
+## 15. SaaS + Paystack roadmap (active work)
+
+Decisions locked in as of 2026-11-16:
+
+1. **PostgreSQL only** for cloud. `server-pg.js` is canonical.
+2. **True multi-tenancy** — one deployment, many tenants, RLS isolation.
+3. **Auxano stays desktop-only.** No migration to cloud, no grandfathering.
+   Cloud edition starts fresh.
+4. **Mobile monitoring app deferred** until SaaS + Paystack is done. But
+   JWT must carry `tenant_id` from day one so it works later.
+5. **Paystack subscriptions** replace RSA license keys in the cloud edition.
+
+### Planned build order
+
+1. `tenants` table + `tenant_id` on every business table.
+2. Enable Postgres RLS + create non-owner `app_user` role + point
+   `.env.pg` / Render env at it.
+3. Add `tenant_id` to JWT on login; add `setTenantContext` middleware
+   that sets `app.tenant_id` per request; convert routes from
+   `pool.query` to a request-scoped `req.db`.
+4. Add `requireActiveSubscription` middleware (temporarily bypassed for
+   demo tenant).
+5. Paystack plans + `/api/billing/initialize` + signature-verified
+   `/api/billing/webhook` (must be registered with `express.raw` before
+   `express.json`).
+6. Flutter: tenant field on login, 402 handling, billing screen.
+7. Remove bypass; end-to-end test with Paystack test keys.
+
+Estimated ~2–3 weeks. Highest-risk step is #3 — any unconverted
+`pool.query` in a route bypasses RLS and can leak cross-tenant data.
+After conversion, `grep -rn "pool.query" server-pg.js` should return
+only auth/tenant-management routes.
+
+### Deferred (after SaaS + Paystack)
+
+- Mobile monitoring app (separate Flutter project, oversight-only)
+- Real-time approval flow (WebSockets/SSE) replacing discount PINs in
+  cloud edition
+- Netlify ↔ GitHub auto-deploy
+- Product image / company logo upload on web

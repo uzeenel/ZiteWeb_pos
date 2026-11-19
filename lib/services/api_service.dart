@@ -32,11 +32,19 @@ class ApiService {
 
   // ==================== AUTH ====================
 
-  static Future<bool> login(String username, String password) async {
+    static Future<bool> login(
+    String username,
+    String password,
+    String tenantSlug,
+  ) async {
     try {
       final response = await http.post(
         Uri.parse('$baseUrl/login'),
-        body: jsonEncode({'username': username, 'password': password}),
+        body: jsonEncode({
+          'username': username,
+          'password': password,
+          'tenant_slug': tenantSlug,
+        }),
         headers: {'Content-Type': 'application/json'},
       );
 
