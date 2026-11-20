@@ -2713,6 +2713,27 @@ class ApiService {
       return false;
     }
   }
+
+    // ==================== BILLING ====================
+
+  static Future<String?> initializeBilling(String planCode) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/billing/initialize'),
+        headers: _headers,
+        body: jsonEncode({'planCode': planCode}),
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return data['authorization_url'];
+      }
+      return null;
+    } catch (e) {
+      print('Error initializing billing: $e');
+      return null;
+    }
+  }
 }
 
  
