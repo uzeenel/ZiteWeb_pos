@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:zite_web_pos/services/api_service.dart';
 import 'package:zite_web_pos/services/auth_service.dart';
 import 'package:zite_web_pos/screens/login_screen.dart';
 
@@ -35,6 +36,7 @@ import 'package:zite_web_pos/screens/opening_balance_screen.dart';
 import 'discount_pin_generate_screen.dart';
 import 'discount_pin_report_screen.dart';
 import 'roles_screen.dart';
+import 'package:zite_web_pos/screens/billing_screen.dart';
 
 
 import 'sidebar.dart'; // new file
@@ -84,6 +86,7 @@ class _HomeScreenState extends State<HomeScreen> {
     const DiscountPinGenerateScreen(),
     const DiscountPinReportScreen(),
     const RolesScreen(),
+    const BillingScreen(),
   ];
 
   void _onItemSelected(int index) {
@@ -100,7 +103,26 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-    @override
+  @override
+  void initState() {
+    super.initState();
+    ApiService.onSubscriptionRequired = () {
+      if (mounted) {
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (context) => const BillingScreen()),
+          (route) => false,
+        );
+      }
+    };
+  }
+
+  @override
+  void dispose() {
+    ApiService.onSubscriptionRequired = null; // Clean up the callback
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {

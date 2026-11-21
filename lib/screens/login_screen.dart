@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:zite_web_pos/services/api_service.dart';
 import 'package:zite_web_pos/services/auth_service.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -18,7 +19,7 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _isLoading = false;
   bool _obscurePassword = true;
 
-  Future<void> _login() async {
+    Future<void> _login() async {
     setState(() {
       _isLoading = true;
     });
@@ -34,7 +35,16 @@ class _LoginScreenState extends State<LoginScreen> {
     });
 
     if (success) {
-      Navigator.pushReplacementNamed(context, '/home');
+      // Check if the tenant has an active subscription
+      final hasActiveSub = await ApiService.checkSubscription();
+
+      if (!hasActiveSub) {
+        // If not active, route directly to Billing
+        Navigator.pushReplacementNamed(context, '/billing');
+      } else {
+        // If active, go to home
+        Navigator.pushReplacementNamed(context, '/home');
+      }
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(

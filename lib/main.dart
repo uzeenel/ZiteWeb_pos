@@ -16,6 +16,9 @@ import 'screens/sales_return_screen.dart';
 import 'screens/unit_management_screen.dart';
 import 'screens/vendor_payment_screen.dart';
 import 'services/backend_service.dart';
+import 'package:zite_web_pos/screens/billing_screen.dart';
+import 'screens/billing_callback_screen.dart';
+
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -112,6 +115,7 @@ class _MyAppState extends State<MyApp> with WindowListener {
       home: LoginScreen(),
       routes: {
         '/home': (context) => HomeScreen(onToggleTheme: _toggleTheme),
+        '/billing': (context) => const BillingScreen(),
         '/products': (context) => const ProductManagementScreen(),
         '/categories': (context) => const CategoryManagementScreen(),
         '/settings': (context) => const CompanySettingsScreen(),
@@ -123,6 +127,7 @@ class _MyAppState extends State<MyApp> with WindowListener {
         '/sales-returns': (context) => const SalesReturnScreen(),
         '/units': (context) => const UnitManagementScreen(),
         '/vendor-payments': (context) => const VendorPaymentScreen(),
+        '/billing-callback': (context) => const BillingCallbackScreen(),
       },
     );
   }

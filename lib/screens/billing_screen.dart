@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:zite_web_pos/services/api_service.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class BillingScreen extends StatefulWidget {
   const BillingScreen({super.key});
@@ -11,30 +12,28 @@ class BillingScreen extends StatefulWidget {
 class _BillingScreenState extends State<BillingScreen> {
   bool _isLoading = false;
 
-  Future<void> _subscribe() async {
+    Future<void> _subscribe() async {
     setState(() => _isLoading = true);
 
-    // In a real app, you'd fetch the available plans from the backend.
-    // For now, we'll hardcode a placeholder plan code.
-    // YOU MUST REPLACE THIS WITH A REAL PLAN CODE FROM YOUR PAYSTACK DASHBOARD.
-    const planCode = 'PLN_your_actual_plan_code_here';
-
-    final url = await ApiService.initializeBilling(planCode);
+    // For testing, we'll just charge ₦5,000 (Paystack uses kobo, so 5000 * 100 = 500000)
+    final url = await ApiService.initializeBilling(amount: 500000);
 
     setState(() => _isLoading = false);
 
     if (url != null) {
-      // In a web app, you would normally use url_launcher to open this.
-      // Since we are on Flutter Web, we can use the window object or url_launcher.
-      // I'll assume you have url_launcher in pubspec.yaml. If not, we'll add it.
-      print('Redirecting to: $url');
-      // Example using url_launcher:
-      // await launchUrl(Uri.parse(url));
-
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Checkout URL generated: $url')));
+      final uri = Uri.parse(url);
+      if (await canLaunchUrl(uri)) {
+        // Opens the Paystack checkout in the same tab
+        await launchUrl(uri, webOnlyWindowName: '_self');
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Could not open Paystack checkout'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
       }
     } else {
       if (mounted) {

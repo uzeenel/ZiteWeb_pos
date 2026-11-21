@@ -7,9 +7,10 @@ import 'package:zite_web_pos/models/category.dart';
 import 'package:zite_web_pos/models/cart_item.dart';
 import 'package:zite_web_pos/models/sales_return.dart';
 
-class ApiService {
+class ApiService {  
   static const String baseUrl = 'https://zitemart-api.onrender.com/api';
   static String? _token;
+  static void Function()? onSubscriptionRequired;
   static User? _currentUser;
 
   static void setToken(String token) {
@@ -32,7 +33,7 @@ class ApiService {
 
   // ==================== AUTH ====================
 
-    static Future<bool> login(
+  static Future<bool> login(
     String username,
     String password,
     String tenantSlug,
@@ -105,9 +106,14 @@ class ApiService {
         headers: _headers,
       );
 
+      if (response.statusCode == 402) {
+        if (onSubscriptionRequired != null) onSubscriptionRequired!();
+        return {};
+      }
+
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-       return {
+        return {
           'totalSalesToday': _toDouble(data['totalSalesToday']),
           'totalSalesThisWeek': _toDouble(data['totalSalesThisWeek']),
           'totalSalesThisMonth': _toDouble(data['totalSalesThisMonth']),
@@ -225,7 +231,7 @@ class ApiService {
     }
   }
 
-    static Future<void> updateProduct(
+  static Future<void> updateProduct(
     int id,
     Map<String, dynamic> product,
   ) async {
@@ -262,7 +268,6 @@ class ApiService {
     }
   }
 
-  
   static Future<void> updateStock(int productId, double quantity) async {
     print('🔴 API CALL: updateStock productId=$productId, quantity=$quantity');
     try {
@@ -382,7 +387,7 @@ class ApiService {
 
   // ==================== SALES ====================
 
-    static Future<Map<String, dynamic>> saveSale({
+  static Future<Map<String, dynamic>> saveSale({
     required List<CartItem> cart,
     required double subtotal,
     required double tax,
@@ -419,7 +424,7 @@ class ApiService {
         'customerId': customerId,
         'discountType': discountType,
         'discountValue': discountValue,
-        'discountPin': discountPin, 
+        'discountPin': discountPin,
       };
 
       print('=== SAVE SALE ===');
@@ -458,13 +463,11 @@ class ApiService {
       final end = DateTime.now();
       final start = end.subtract(const Duration(days: 30));
 
-      final url = '$baseUrl/sales?start=${start.toIso8601String()}&end=${end.toIso8601String()}';
+      final url =
+          '$baseUrl/sales?start=${start.toIso8601String()}&end=${end.toIso8601String()}';
       print('📊 GET SALES URL: $url');
-      
-      final response = await http.get(
-        Uri.parse(url),
-        headers: _headers,
-      );
+
+      final response = await http.get(Uri.parse(url), headers: _headers);
 
       print('📊 GET SALES RESPONSE: status=${response.statusCode}');
       print('📊 GET SALES BODY: ${response.body}');
@@ -496,7 +499,9 @@ class ApiService {
       );
 
       print('=== API GET SALES BY DATE RANGE ===');
-      print('URL: $baseUrl/sales?start=${start.toIso8601String()}&end=${end.toIso8601String()}');
+      print(
+        'URL: $baseUrl/sales?start=${start.toIso8601String()}&end=${end.toIso8601String()}',
+      );
       print('Response status: ${response.statusCode}');
       print('Response body: ${response.body}');
 
@@ -1958,7 +1963,27 @@ class ApiService {
     }
   }
 
-    static Future<Map<String, dynamic>> generateDiscountPins({
+    static Future<bool> checkSubscription() async {
+    try {
+      // We can use the dashboard endpoint as a ping.
+      // If it returns 200, they are active. If 402, they are inactive.
+      final response = await http.get(
+        Uri.parse('$baseUrl/dashboard'),
+        headers: _headers,
+      );
+
+      if (response.statusCode == 402) {
+        return false;
+      }
+      return true;
+    } catch (e) {
+      // If the network fails, default to true so they aren't locked out
+      // of the app for a bad wifi connection.
+      return true;
+    }
+  }
+
+  static Future<Map<String, dynamic>> generateDiscountPins({
     required int count,
     required String maxDiscountType,
     required double maxDiscountValue,
@@ -2407,7 +2432,7 @@ class ApiService {
     }
   }
 
-   // ==================== LAYAWAY ENDPOINTS ====================
+  // ==================== LAYAWAY ENDPOINTS ====================
 
   static Future<List<Map<String, dynamic>>> getLayawayOrders() async {
     try {
@@ -2569,7 +2594,7 @@ class ApiService {
     }
   }
 
-    // ==================== ROLES & PERMISSIONS ====================
+  // ==================== ROLES & PERMISSIONS ====================
 
   static Future<List<Map<String, dynamic>>> getRoles() async {
     try {
@@ -2697,7 +2722,6 @@ class ApiService {
     }
   }
 
-
   // ==================== HELPERS ====================
 
   static Future<bool> testConnection() async {
@@ -2714,20 +2738,24 @@ class ApiService {
     }
   }
 
-    // ==================== BILLING ====================
+  // ==================== BILLING ====================
 
-  static Future<String?> initializeBilling(String planCode) async {
+  static Future<String?> initializeBilling({String? planCode, int? amount}) async {
     try {
       final response = await http.post(
         Uri.parse('$baseUrl/billing/initialize'),
         headers: _headers,
-        body: jsonEncode({'planCode': planCode}),
+        body: jsonEncode({
+          if (planCode != null) 'planCode': planCode,
+          if (amount != null) 'amount': amount
+        }),
       );
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         return data['authorization_url'];
       }
+      print('Billing init failed: ${response.body}');
       return null;
     } catch (e) {
       print('Error initializing billing: $e');
@@ -2735,5 +2763,3 @@ class ApiService {
     }
   }
 }
-
- 
