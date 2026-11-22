@@ -31,6 +31,52 @@ class ApiService {
   };
   static Map<String, String> get authHeaders => _headers;
 
+  static Future<Map<String, dynamic>?> register({
+    required String businessName,
+    required String businessSlug,
+    required String email,
+    required String username,
+    required String password,
+    required String fullName,
+  }) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/register'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'businessName': businessName,
+          'businessSlug': businessSlug,
+          'email': email,
+          'username': username,
+          'password': password,
+          'fullName': fullName,
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        _token = data['token'];
+        _currentUser = User(
+          id: data['user']['id'],
+          username: data['user']['username'],
+          password: '',
+          fullName: data['user']['fullName'],
+          role: _stringToRole(data['user']['role'].toString()),
+          createdAt: DateTime.now(),
+        );
+        return data;
+      }
+
+      // Show backend error
+      final errorBody = jsonDecode(response.body);
+      print('Register failed: ${errorBody['error'] ?? response.body}');
+      return null;
+    } catch (e) {
+      print('Register error: $e');
+      return null;
+    }
+  }
+
   // ==================== AUTH ====================
 
   static Future<bool> login(
