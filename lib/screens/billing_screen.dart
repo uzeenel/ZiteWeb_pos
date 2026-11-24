@@ -25,9 +25,7 @@ class _BillingScreenState extends State<BillingScreen> {
 
   Future<void> _fetchPlans() async {
     try {
-      final response = await http.get(
-        Uri.parse('${ApiService.baseUrl}/billing/plans'),
-      );
+      final response = await http.get(Uri.parse('${ApiService.baseUrl}/billing/plans'));
       if (response.statusCode == 200) {
         final plans = jsonDecode(response.body) as List;
         setState(() {
@@ -49,10 +47,7 @@ class _BillingScreenState extends State<BillingScreen> {
   Future<void> _subscribe() async {
     if (_selectedPlanCode == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please select a plan first'),
-          backgroundColor: Colors.red,
-        ),
+        const SnackBar(content: Text('Please select a plan first'), backgroundColor: Colors.red),
       );
       return;
     }
@@ -70,20 +65,14 @@ class _BillingScreenState extends State<BillingScreen> {
       } else {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Could not open Paystack checkout'),
-              backgroundColor: Colors.red,
-            ),
+            const SnackBar(content: Text('Could not open Paystack checkout'), backgroundColor: Colors.red),
           );
         }
       }
     } else {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Failed to start checkout'),
-            backgroundColor: Colors.red,
-          ),
+          const SnackBar(content: Text('Failed to start checkout'), backgroundColor: Colors.red),
         );
       }
     }
@@ -97,105 +86,110 @@ class _BillingScreenState extends State<BillingScreen> {
           ? const Center(child: CircularProgressIndicator())
           : Center(
               child: SingleChildScrollView(
-                child: Card(
-                  margin: const EdgeInsets.all(32),
-                  child: Padding(
-                    padding: const EdgeInsets.all(32),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(
-                          Icons.lock_outline,
-                          size: 64,
-                          color: Colors.orange,
-                        ),
-                        const SizedBox(height: 16),
-                        const Text(
-                          'Subscription Required',
-                          style: TextStyle(
-                            fontSize: 24,
-                            fontWeight: FontWeight.bold,
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 600),
+                  child: Card(
+                    margin: const EdgeInsets.all(32),
+                    child: Padding(
+                      padding: const EdgeInsets.all(32),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(
+                            Icons.lock_outline,
+                            size: 64,
+                            color: Colors.orange,
                           ),
-                        ),
-                        const SizedBox(height: 8),
-                        const Text(
-                          'Choose a plan to continue using ZiteMart.',
-                          textAlign: TextAlign.center,
-                        ),
-                        const SizedBox(height: 24),
-                        ..._plans.map((plan) {
-                          final isSelected =
-                              _selectedPlanCode == plan['paystack_plan_code'];
-                          return Padding(
-                            padding: const EdgeInsets.only(bottom: 12),
-                            child: InkWell(
-                              onTap: () => setState(
-                                () => _selectedPlanCode =
-                                    plan['paystack_plan_code'],
-                              ),
-                              child: Container(
-                                padding: const EdgeInsets.all(16),
-                                decoration: BoxDecoration(
-                                  border: Border.all(
-                                    color: isSelected
-                                        ? Colors.blue
-                                        : Colors.grey.shade300,
-                                    width: isSelected ? 2 : 1,
-                                  ),
-                                  borderRadius: BorderRadius.circular(8),
+                          const SizedBox(height: 16),
+                          const Text(
+                            'Subscription Required',
+                            style: TextStyle(
+                              fontSize: 24,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          const Text(
+                            'Choose a plan to continue using ZiteMart.',
+                            textAlign: TextAlign.center,
+                          ),
+                          const SizedBox(height: 24),
+                          ..._plans.map((plan) {
+                            final isSelected =
+                                _selectedPlanCode == plan['paystack_plan_code'];
+                            return Padding(
+                              padding: const EdgeInsets.only(bottom: 12),
+                              child: InkWell(
+                                onTap: () => setState(
+                                  () => _selectedPlanCode =
+                                      plan['paystack_plan_code'],
                                 ),
-                                child: Row(
-                                  children: [
-                                    Icon(
-                                      isSelected
-                                          ? Icons.radio_button_checked
-                                          : Icons.radio_button_unchecked,
+                                child: Container(
+                                  padding: const EdgeInsets.all(16),
+                                  decoration: BoxDecoration(
+                                    border: Border.all(
                                       color: isSelected
                                           ? Colors.blue
-                                          : Colors.grey,
+                                          : Colors.grey.shade300,
+                                      width: isSelected ? 2 : 1,
                                     ),
-                                    const SizedBox(width: 12),
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            plan['name'],
-                                            style: const TextStyle(
-                                              fontSize: 18,
-                                              fontWeight: FontWeight.bold,
-                                            ),
-                                          ),
-                                          Text(
-                                            '₦${(plan['amount'] / 100).toStringAsFixed(0)} /month',
-                                            style: const TextStyle(
-                                              color: Colors.grey,
-                                            ),
-                                          ),
-                                        ],
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      Icon(
+                                        isSelected
+                                            ? Icons.radio_button_checked
+                                            : Icons.radio_button_unchecked,
+                                        color: isSelected
+                                            ? Colors.blue
+                                            : Colors.grey,
                                       ),
-                                    ),
-                                  ],
+                                      const SizedBox(width: 12),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              plan['name'],
+                                              style: const TextStyle(
+                                                fontSize: 18,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                            Text(
+                                              '₦${(plan['amount'] / 100).toStringAsFixed(0)} /month',
+                                              style: const TextStyle(
+                                                color: Colors.grey,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
+                                  ),
                                 ),
                               ),
+                            );
+                          }).toList(),
+                          const SizedBox(height: 16),
+                          SizedBox(
+                            width: double.infinity,
+                            child: ElevatedButton(
+                              onPressed: _isLoading ? null : _subscribe,
+                              style: ElevatedButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 16,
+                                ),
+                              ),
+                              child: _isLoading
+                                  ? const CircularProgressIndicator()
+                                  : const Text('Subscribe Now'),
                             ),
-                          );
-                        }).toList(),
-                        const SizedBox(height: 16),
-                        SizedBox(
-                          width: double.infinity,
-                          child: ElevatedButton(
-                            onPressed: _isLoading ? null : _subscribe,
-                            style: ElevatedButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(vertical: 16),
-                            ),
-                            child: _isLoading
-                                ? const CircularProgressIndicator()
-                                : const Text('Subscribe Now'),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
                 ),
