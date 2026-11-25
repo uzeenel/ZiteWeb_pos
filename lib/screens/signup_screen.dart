@@ -48,7 +48,8 @@ class _SignupScreenState extends State<SignupScreen> {
 
     // Success: token and user are already saved by ApiService.register
     if (mounted) {
-      Navigator.pushReplacementNamed(context, '/billing');
+      // Redirect straight to the dashboard for the free trial
+      Navigator.pushReplacementNamed(context, '/home');
     }
   }
 
