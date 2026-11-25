@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:zite_web_pos/services/api_service.dart';
+import 'package:zite_web_pos/utils/permissions.dart';
+
 
 class SignupScreen extends StatefulWidget {
   const SignupScreen({super.key});
@@ -47,10 +49,15 @@ class _SignupScreenState extends State<SignupScreen> {
     }
 
     // Success: token and user are already saved by ApiService.register
+    // Load this user's permissions before the Dashboard guard runs.
+    final perms = await ApiService.getMyPermissions();
+    Permissions.setPermissions(perms);
+
     if (mounted) {
       // Redirect straight to the dashboard for the free trial
       Navigator.pushReplacementNamed(context, '/home');
     }
+
   }
 
   @override
