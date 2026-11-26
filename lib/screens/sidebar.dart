@@ -262,6 +262,11 @@ class _SidebarState extends State<Sidebar> {
                           onPressed: () => widget.onItemSelected(25),
                           tooltip: 'Backup',
                         ),
+                        IconButton(
+                          icon: const Icon(Icons.subscriptions, color: Colors.white70),
+                          onPressed: () => widget.onItemSelected(32),
+                          tooltip: 'Subscription',
+                        )
                       ],
                     ),
                   )
@@ -280,7 +285,7 @@ class _SidebarState extends State<Sidebar> {
                         collapsedBackgroundColor: Colors.transparent,
                         initiallyExpanded: _isMainExpanded,
                         onExpansionChanged: (expanded) =>
-                            setState(() => _isMainExpanded = expanded),
+                          setState(() => _isMainExpanded = expanded),
                         children: [
                           _buildMenuItem(Icons.dashboard, 'Dashboard', 0),
                           _buildMenuItem(Icons.shopping_cart, 'POS', 1),
@@ -357,7 +362,7 @@ class _SidebarState extends State<Sidebar> {
                         collapsedBackgroundColor: Colors.transparent,
                         initiallyExpanded: _isReportsExpanded,
                         onExpansionChanged: (expanded) =>
-                            setState(() => _isReportsExpanded = expanded),
+                          setState(() => _isReportsExpanded = expanded),
                         children: [
                           _buildMenuItem(Icons.receipt_long, 'Sales Report', 3),
                           _buildMenuItem(Icons.inventory, 'Stock Report', 4),
@@ -383,8 +388,9 @@ class _SidebarState extends State<Sidebar> {
                         collapsedBackgroundColor: Colors.transparent,
                         initiallyExpanded: _isSystemExpanded,
                         onExpansionChanged: (expanded) =>
-                            setState(() => _isSystemExpanded = expanded),
+                          setState(() => _isSystemExpanded = expanded),
                         children: [
+                          _buildMenuItem(Icons.subscriptions, 'Subscription', 32),
                           _buildMenuItem(Icons.business_center, 'Company Settings', 19),
                           _buildMenuItem(Icons.check_circle, 'Credit Sales Approval', 21),
                           _buildMenuItem(Icons.credit_card, 'Customer Credit', 22),
