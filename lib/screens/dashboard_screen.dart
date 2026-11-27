@@ -3,8 +3,11 @@ import 'package:intl/intl.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:zite_web_pos/models/dashboard_data.dart';
 import 'package:zite_web_pos/services/dashboard_service.dart';
+import 'package:zite_web_pos/services/api_service.dart';
 import 'package:zite_web_pos/utils/permissions.dart';
 import 'package:zite_web_pos/screens/unauthorized_screen.dart';
+import 'dart:convert';
+import 'package:http/http.dart' as http;
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -17,6 +20,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   final DashboardService _service = DashboardService();
   DashboardData? _data;
   bool _isLoading = true;
+  Map<String, dynamic>? _billingStatus;
 
   final _currencyFormat = NumberFormat("#,##0.00");
   final _dateFormat = DateFormat('EEE, MMM d');
@@ -25,6 +29,80 @@ class _DashboardScreenState extends State<DashboardScreen> {
   void initState() {
     super.initState();
     _loadData();
+    _fetchBillingStatus();
+  }
+
+  Future<void> _fetchBillingStatus() async {
+    try {
+      final response = await http.get(
+        Uri.parse('${ApiService.baseUrl}/billing/status'),
+        headers: {'Authorization': 'Bearer ${ApiService.token}'},
+      );
+      if (response.statusCode == 200) {
+        setState(() {
+          _billingStatus = jsonDecode(response.body) as Map<String, dynamic>;
+        });
+      }
+    } catch (e) {
+      print('Dashboard billing status fetch error: $e');
+    }
+  }
+
+  Widget? _buildBillingBanner() {
+    if (_billingStatus == null) return null;
+
+    final status = _billingStatus!['subscription_status'] as String?;
+    final periodEnd = _billingStatus!['current_period_end'] as String?;
+
+    String text;
+    Color color;
+    IconData icon;
+
+    if (status == 'attention') {
+      icon = Icons.warning_amber_rounded;
+      color = Colors.red;
+      text =
+          'Payment failed. Please update your subscription to continue using ZiteMart.';
+    } else if (status == 'cancelled') {
+      icon = Icons.cancel;
+      color = Colors.red;
+      text = 'Your subscription is cancelled. Resubscribe to regain access.';
+    } else if (status == 'non-renewing' && periodEnd != null) {
+      final days = DateTime.parse(periodEnd).difference(DateTime.now()).inDays;
+      if (days <= 3) {
+        icon = Icons.access_time;
+        color = Colors.orange;
+        text = days > 0
+            ? 'Your trial expires in $days day${days == 1 ? "" : "s"}. Subscribe now to keep access.'
+            : 'Your trial has expired. Subscribe to continue.';
+      } else {
+        return null;
+      }
+    } else {
+      return null;
+    }
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.15),
+        border: Border.all(color: color),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: color),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              text,
+              style: TextStyle(color: color, fontWeight: FontWeight.w600),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _loadData() async {
@@ -64,6 +142,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  if (_buildBillingBanner() case final banner?) banner,
                   // Welcome header
                   const Text(
                     'Today\'s Overview',
