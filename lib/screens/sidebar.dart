@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'dart:convert';
+import 'package:http/http.dart' as http;
+import 'package:zite_web_pos/services/api_service.dart';
 
 class Sidebar extends StatefulWidget {
   final int selectedIndex;
@@ -25,6 +28,29 @@ class _SidebarState extends State<Sidebar> {
   bool _isInventoryExpanded = true;
   bool _isReportsExpanded = true;
   bool _isSystemExpanded = true;
+  Map<String, dynamic>? _billingStatus;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchBillingStatus();
+  }
+
+  Future<void> _fetchBillingStatus() async {
+    try {
+      final response = await http.get(
+        Uri.parse('${ApiService.baseUrl}/billing/status'),
+        headers: {'Authorization': 'Bearer ${ApiService.token}'},
+      );
+      if (response.statusCode == 200) {
+        setState(() {
+          _billingStatus = jsonDecode(response.body) as Map<String, dynamic>;
+        });
+      }
+    } catch (e) {
+      print('Sidebar billing status fetch error: $e');
+    }
+  }
 
   Widget _buildMenuItem(IconData icon, String title, int index) {
     final isSelected = widget.selectedIndex == index;
@@ -45,9 +71,89 @@ class _SidebarState extends State<Sidebar> {
           onTap: () => widget.onItemSelected(index),
           dense: true,
           visualDensity: const VisualDensity(horizontal: -4, vertical: -4),
-          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 12,
+            vertical: 4,
+          ),
           horizontalTitleGap: 8,
           minLeadingWidth: 24,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBillingStatusFooter() {
+    if (_billingStatus == null) return const SizedBox.shrink();
+
+    final status = _billingStatus!['subscription_status'] as String?;
+    final periodEnd = _billingStatus!['current_period_end'] as String?;
+
+    String label;
+    Color color;
+
+    if (status == 'non-renewing') {
+      final days = periodEnd != null
+          ? DateTime.parse(periodEnd).difference(DateTime.now()).inDays
+          : 0;
+      label = days > 0 ? 'Trial: $days days left' : 'Trial expired';
+      color = Colors.orange;
+    } else if (status == 'active') {
+      final days = periodEnd != null
+          ? DateTime.parse(periodEnd).difference(DateTime.now()).inDays
+          : 0;
+      label = days > 0 ? 'Renews in $days days' : 'Renewal due';
+      color = Colors.green;
+    } else if (status == 'attention') {
+      label = 'Payment required';
+      color = Colors.red;
+    } else if (status == 'cancelled') {
+      label = 'Subscription cancelled';
+      color = Colors.red;
+    } else {
+      label = 'Unknown status';
+      color = Colors.grey;
+    }
+
+    if (_isCollapsed) {
+      // When collapsed, show just a small colored dot with tooltip
+      return Tooltip(
+        message: label,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          child: Container(
+            width: 10,
+            height: 10,
+            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+          ),
+        ),
+      );
+    }
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.15),
+          border: Border.all(color: color),
+          borderRadius: BorderRadius.circular(6),
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.circle, size: 8, color: color),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                label,
+                style: TextStyle(
+                  color: color,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                ),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -97,22 +203,31 @@ class _SidebarState extends State<Sidebar> {
                       children: [
                         // Main section icons
                         IconButton(
-                          icon: const Icon(Icons.dashboard, color: Colors.white70),
+                          icon: const Icon(
+                            Icons.dashboard,
+                            color: Colors.white70,
+                          ),
                           onPressed: () => widget.onItemSelected(0),
                           tooltip: 'Dashboard',
                         ),
                         IconButton(
-                          icon: const Icon(Icons.shopping_cart, color: Colors.white70),
+                          icon: const Icon(
+                            Icons.shopping_cart,
+                            color: Colors.white70,
+                          ),
                           onPressed: () => widget.onItemSelected(1),
                           tooltip: 'POS',
                         ),
                         IconButton(
-                          icon: const Icon(Icons.history, color: Colors.white70),
+                          icon: const Icon(
+                            Icons.history,
+                            color: Colors.white70,
+                          ),
                           onPressed: () => widget.onItemSelected(2),
                           tooltip: 'Sales History',
                         ),
                         const Divider(color: Colors.white24, height: 1),
-                        
+
                         // Management section icons
                         IconButton(
                           icon: const Icon(Icons.people, color: Colors.white70),
@@ -120,40 +235,61 @@ class _SidebarState extends State<Sidebar> {
                           tooltip: 'Customers',
                         ),
                         IconButton(
-                          icon: const Icon(Icons.category, color: Colors.white70),
+                          icon: const Icon(
+                            Icons.category,
+                            color: Colors.white70,
+                          ),
                           onPressed: () => widget.onItemSelected(10),
                           tooltip: 'Categories',
                         ),
                         IconButton(
-                          icon: const Icon(Icons.inventory, color: Colors.white70),
+                          icon: const Icon(
+                            Icons.inventory,
+                            color: Colors.white70,
+                          ),
                           onPressed: () => widget.onItemSelected(11),
                           tooltip: 'Products',
                         ),
                         IconButton(
-                          icon: const Icon(Icons.business, color: Colors.white70),
+                          icon: const Icon(
+                            Icons.business,
+                            color: Colors.white70,
+                          ),
                           onPressed: () => widget.onItemSelected(12),
                           tooltip: 'Vendors',
                         ),
                         IconButton(
-                          icon: const Icon(Icons.payment, color: Colors.white70),
+                          icon: const Icon(
+                            Icons.payment,
+                            color: Colors.white70,
+                          ),
                           onPressed: () => widget.onItemSelected(13),
                           tooltip: 'Vendor Payments',
                         ),
                         IconButton(
-                          icon: const Icon(Icons.people_outline, color: Colors.white70),
+                          icon: const Icon(
+                            Icons.people_outline,
+                            color: Colors.white70,
+                          ),
                           onPressed: () => widget.onItemSelected(20),
                           tooltip: 'User Management',
                         ),
                         const Divider(color: Colors.white24, height: 1),
-                        
+
                         // Inventory section icons
                         IconButton(
-                          icon: const Icon(Icons.add_shopping_cart, color: Colors.white70),
+                          icon: const Icon(
+                            Icons.add_shopping_cart,
+                            color: Colors.white70,
+                          ),
                           onPressed: () => widget.onItemSelected(14),
                           tooltip: 'Purchase Order',
                         ),
                         IconButton(
-                          icon: const Icon(Icons.list_alt, color: Colors.white70),
+                          icon: const Icon(
+                            Icons.list_alt,
+                            color: Colors.white70,
+                          ),
                           onPressed: () => widget.onItemSelected(15),
                           tooltip: 'PO List',
                         ),
@@ -168,35 +304,53 @@ class _SidebarState extends State<Sidebar> {
                           tooltip: 'Units',
                         ),
                         IconButton(
-                          icon: const Icon(Icons.trending_up, color: Colors.white70),
+                          icon: const Icon(
+                            Icons.trending_up,
+                            color: Colors.white70,
+                          ),
                           onPressed: () => widget.onItemSelected(18),
                           tooltip: 'Stock Movement',
                         ),
                         const Divider(color: Colors.white24, height: 1),
-                        
+
                         // Reports section icons
                         IconButton(
-                          icon: const Icon(Icons.receipt_long, color: Colors.white70),
+                          icon: const Icon(
+                            Icons.receipt_long,
+                            color: Colors.white70,
+                          ),
                           onPressed: () => widget.onItemSelected(3),
                           tooltip: 'Sales Report',
                         ),
                         IconButton(
-                          icon: const Icon(Icons.inventory, color: Colors.white70),
+                          icon: const Icon(
+                            Icons.inventory,
+                            color: Colors.white70,
+                          ),
                           onPressed: () => widget.onItemSelected(4),
                           tooltip: 'Stock Report',
                         ),
                         IconButton(
-                          icon: const Icon(Icons.account_balance_wallet, color: Colors.white70),
+                          icon: const Icon(
+                            Icons.account_balance_wallet,
+                            color: Colors.white70,
+                          ),
                           onPressed: () => widget.onItemSelected(5),
                           tooltip: 'Cash Book',
                         ),
                         IconButton(
-                          icon: const Icon(Icons.account_balance, color: Colors.white70),
+                          icon: const Icon(
+                            Icons.account_balance,
+                            color: Colors.white70,
+                          ),
                           onPressed: () => widget.onItemSelected(6),
                           tooltip: 'Bank Book',
                         ),
                         IconButton(
-                          icon: const Icon(Icons.money_off, color: Colors.white70),
+                          icon: const Icon(
+                            Icons.money_off,
+                            color: Colors.white70,
+                          ),
                           onPressed: () => widget.onItemSelected(7),
                           tooltip: 'Expenses',
                         ),
@@ -206,30 +360,45 @@ class _SidebarState extends State<Sidebar> {
                           tooltip: 'Sales Return',
                         ),
                         const Divider(color: Colors.white24, height: 1),
-                        
+
                         // System section icons
                         IconButton(
-                          icon: const Icon(Icons.business_center, color: Colors.white70),
+                          icon: const Icon(
+                            Icons.business_center,
+                            color: Colors.white70,
+                          ),
                           onPressed: () => widget.onItemSelected(19),
                           tooltip: 'Company Settings',
                         ),
                         IconButton(
-                          icon: const Icon(Icons.check_circle, color: Colors.white70),
+                          icon: const Icon(
+                            Icons.check_circle,
+                            color: Colors.white70,
+                          ),
                           onPressed: () => widget.onItemSelected(21),
                           tooltip: 'Credit Approval',
                         ),
                         IconButton(
-                          icon: const Icon(Icons.credit_card, color: Colors.white70),
+                          icon: const Icon(
+                            Icons.credit_card,
+                            color: Colors.white70,
+                          ),
                           onPressed: () => widget.onItemSelected(22),
                           tooltip: 'Customer Credit',
                         ),
                         IconButton(
-                          icon: const Icon(Icons.account_balance, color: Colors.white70),
+                          icon: const Icon(
+                            Icons.account_balance,
+                            color: Colors.white70,
+                          ),
                           onPressed: () => widget.onItemSelected(23),
                           tooltip: 'Bank Accounts',
                         ),
                         IconButton(
-                          icon: const Icon(Icons.business, color: Colors.white70),
+                          icon: const Icon(
+                            Icons.business,
+                            color: Colors.white70,
+                          ),
                           onPressed: () => widget.onItemSelected(24),
                           tooltip: 'Bank Management',
                         ),
@@ -248,7 +417,7 @@ class _SidebarState extends State<Sidebar> {
                           ),
                           onPressed: () => widget.onItemSelected(30),
                           tooltip: 'PIN Report',
-                        ),                        
+                        ),
                         IconButton(
                           icon: const Icon(
                             Icons.security,
@@ -263,10 +432,13 @@ class _SidebarState extends State<Sidebar> {
                           tooltip: 'Backup',
                         ),
                         IconButton(
-                          icon: const Icon(Icons.subscriptions, color: Colors.white70),
+                          icon: const Icon(
+                            Icons.subscriptions,
+                            color: Colors.white70,
+                          ),
                           onPressed: () => widget.onItemSelected(32),
                           tooltip: 'Subscription',
-                        )
+                        ),
                       ],
                     ),
                   )
@@ -285,7 +457,7 @@ class _SidebarState extends State<Sidebar> {
                         collapsedBackgroundColor: Colors.transparent,
                         initiallyExpanded: _isMainExpanded,
                         onExpansionChanged: (expanded) =>
-                          setState(() => _isMainExpanded = expanded),
+                            setState(() => _isMainExpanded = expanded),
                         children: [
                           _buildMenuItem(Icons.dashboard, 'Dashboard', 0),
                           _buildMenuItem(Icons.shopping_cart, 'POS', 1),
@@ -316,7 +488,11 @@ class _SidebarState extends State<Sidebar> {
                           _buildMenuItem(Icons.inventory, 'Products', 11),
                           _buildMenuItem(Icons.business, 'Vendors', 12),
                           _buildMenuItem(Icons.payment, 'Vendor Payments', 13),
-                          _buildMenuItem(Icons.people_outline, 'User Management', 20),                         
+                          _buildMenuItem(
+                            Icons.people_outline,
+                            'User Management',
+                            20,
+                          ),
                         ],
                       ),
                       // Inventory
@@ -337,13 +513,33 @@ class _SidebarState extends State<Sidebar> {
                         onExpansionChanged: (expanded) =>
                             setState(() => _isInventoryExpanded = expanded),
                         children: [
-                          _buildMenuItem(Icons.add_shopping_cart, 'Purchase Order', 14),
-                          _buildMenuItem(Icons.list_alt, 'Purchase Orders List', 15),
+                          _buildMenuItem(
+                            Icons.add_shopping_cart,
+                            'Purchase Order',
+                            14,
+                          ),
+                          _buildMenuItem(
+                            Icons.list_alt,
+                            'Purchase Orders List',
+                            15,
+                          ),
                           _buildMenuItem(Icons.inbox, 'Receive Stock', 16),
                           _buildMenuItem(Icons.rule, 'Units', 17),
-                          _buildMenuItem(Icons.trending_up, 'Stock Movement', 18),
-                          _buildMenuItem(Icons.settings_overscan, 'Stock Adjustment', 26),                          
-                          _buildMenuItem(Icons.account_balance, "Opening Balance", 28)
+                          _buildMenuItem(
+                            Icons.trending_up,
+                            'Stock Movement',
+                            18,
+                          ),
+                          _buildMenuItem(
+                            Icons.settings_overscan,
+                            'Stock Adjustment',
+                            26,
+                          ),
+                          _buildMenuItem(
+                            Icons.account_balance,
+                            "Opening Balance",
+                            28,
+                          ),
                         ],
                       ),
                       // Reports
@@ -362,11 +558,15 @@ class _SidebarState extends State<Sidebar> {
                         collapsedBackgroundColor: Colors.transparent,
                         initiallyExpanded: _isReportsExpanded,
                         onExpansionChanged: (expanded) =>
-                          setState(() => _isReportsExpanded = expanded),
+                            setState(() => _isReportsExpanded = expanded),
                         children: [
                           _buildMenuItem(Icons.receipt_long, 'Sales Report', 3),
                           _buildMenuItem(Icons.inventory, 'Stock Report', 4),
-                          _buildMenuItem(Icons.account_balance_wallet, 'Cash Book', 5),
+                          _buildMenuItem(
+                            Icons.account_balance_wallet,
+                            'Cash Book',
+                            5,
+                          ),
                           _buildMenuItem(Icons.account_balance, 'Bank Book', 6),
                           _buildMenuItem(Icons.money_off, 'Expenses', 7),
                           _buildMenuItem(Icons.undo, 'Sales Return', 8),
@@ -388,17 +588,41 @@ class _SidebarState extends State<Sidebar> {
                         collapsedBackgroundColor: Colors.transparent,
                         initiallyExpanded: _isSystemExpanded,
                         onExpansionChanged: (expanded) =>
-                          setState(() => _isSystemExpanded = expanded),
+                            setState(() => _isSystemExpanded = expanded),
                         children: [
-                          _buildMenuItem(Icons.subscriptions, 'Subscription', 32),
-                          _buildMenuItem(Icons.business_center, 'Company Settings', 19),
-                          _buildMenuItem(Icons.check_circle, 'Credit Sales Approval', 21),
-                          _buildMenuItem(Icons.credit_card, 'Customer Credit', 22),
-                          _buildMenuItem(Icons.account_balance, 'Bank Accounts', 23),
+                          _buildMenuItem(
+                            Icons.subscriptions,
+                            'Subscription',
+                            32,
+                          ),
+                          _buildMenuItem(
+                            Icons.business_center,
+                            'Company Settings',
+                            19,
+                          ),
+                          _buildMenuItem(
+                            Icons.check_circle,
+                            'Credit Sales Approval',
+                            21,
+                          ),
+                          _buildMenuItem(
+                            Icons.credit_card,
+                            'Customer Credit',
+                            22,
+                          ),
+                          _buildMenuItem(
+                            Icons.account_balance,
+                            'Bank Accounts',
+                            23,
+                          ),
                           _buildMenuItem(Icons.business, 'Bank Management', 24),
-                          _buildMenuItem(Icons.vpn_key, 'Discount PINs', 29,),
+                          _buildMenuItem(Icons.vpn_key, 'Discount PINs', 29),
                           _buildMenuItem(Icons.assignment, 'PIN Report', 30),
-                          _buildMenuItem(Icons.security, 'Roles & Permissions', 31),
+                          _buildMenuItem(
+                            Icons.security,
+                            'Roles & Permissions',
+                            31,
+                          ),
                           _buildMenuItem(Icons.backup, 'Backup', 25),
                         ],
                       ),
@@ -406,45 +630,57 @@ class _SidebarState extends State<Sidebar> {
                   ),
           ),
 
-          // footer
+          //footer
           Container(
             padding: const EdgeInsets.all(12),
-            child: _isCollapsed
-                ? Column(
-                    children: [
-                      IconButton(
-                        icon: Icon(
-                          Theme.of(context).brightness == Brightness.dark
-                              ? Icons.dark_mode
-                              : Icons.light_mode,
-                          color: Colors.white70,
-                        ),
-                        onPressed: () => widget.onToggleTheme?.call(),
+            child: Column(
+              children: [
+                _buildBillingStatusFooter(),
+                const SizedBox(height: 8),
+                _isCollapsed
+                    ? Column(
+                        children: [
+                          IconButton(
+                            icon: Icon(
+                              Theme.of(context).brightness == Brightness.dark
+                                  ? Icons.dark_mode
+                                  : Icons.light_mode,
+                              color: Colors.white70,
+                            ),
+                            onPressed: () => widget.onToggleTheme?.call(),
+                          ),
+                          IconButton(
+                            icon: const Icon(
+                              Icons.logout,
+                              color: Colors.white70,
+                            ),
+                            onPressed: widget.onLogout,
+                          ),
+                        ],
+                      )
+                    : Row(
+                        children: [
+                          const Spacer(),
+                          IconButton(
+                            icon: Icon(
+                              Theme.of(context).brightness == Brightness.dark
+                                  ? Icons.dark_mode
+                                  : Icons.light_mode,
+                              color: Colors.white70,
+                            ),
+                            onPressed: () => widget.onToggleTheme?.call(),
+                          ),
+                          IconButton(
+                            icon: const Icon(
+                              Icons.logout,
+                              color: Colors.white70,
+                            ),
+                            onPressed: widget.onLogout,
+                          ),
+                        ],
                       ),
-                      IconButton(
-                        icon: const Icon(Icons.logout, color: Colors.white70),
-                        onPressed: widget.onLogout,
-                      ),
-                    ],
-                  )
-                : Row(
-                    children: [
-                      const Spacer(),
-                      IconButton(
-                        icon: Icon(
-                          Theme.of(context).brightness == Brightness.dark
-                              ? Icons.dark_mode
-                              : Icons.light_mode,
-                          color: Colors.white70,
-                        ),
-                        onPressed: () => widget.onToggleTheme?.call(),
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.logout, color: Colors.white70),
-                        onPressed: widget.onLogout,
-                      ),
-                    ],
-                  ),
+              ],
+            ),
           ),
         ],
       ),

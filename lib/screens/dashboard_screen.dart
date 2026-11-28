@@ -142,7 +142,20 @@ class _DashboardScreenState extends State<DashboardScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  if (_buildBillingBanner() case final banner?) banner,
+                  if (_buildBillingBanner() != null) _buildBillingBanner()!,
+                  // Tenant name header
+                  if (ApiService.tenantName != null)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: Text(
+                        ApiService.tenantName!,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          color: Colors.grey,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
                   // Welcome header
                   const Text(
                     'Today\'s Overview',

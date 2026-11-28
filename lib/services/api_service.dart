@@ -7,9 +7,10 @@ import 'package:zite_web_pos/models/category.dart';
 import 'package:zite_web_pos/models/cart_item.dart';
 import 'package:zite_web_pos/models/sales_return.dart';
 
-class ApiService {  
+class ApiService {
   static const String baseUrl = 'https://zitemart-api.onrender.com/api';
   static String? _token;
+  static String? _tenantName;
   static void Function()? onSubscriptionRequired;
   static User? _currentUser;
 
@@ -18,6 +19,7 @@ class ApiService {
   }
 
   static String? get token => _token;
+  static String? get tenantName => _tenantName;
 
   static void setCurrentUser(User user) {
     _currentUser = user;
@@ -56,6 +58,7 @@ class ApiService {
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         _token = data['token'];
+        _tenantName = data['user']['tenant_name'];
         _currentUser = User(
           id: data['user']['id'],
           username: data['user']['username'],
@@ -106,6 +109,7 @@ class ApiService {
         print('User: ${data['user']}');
 
         _token = data['token'];
+        _tenantName = data['user']['tenant_name'];
         final roleString = data['user']['role'].toString();
 
         _currentUser = User(
@@ -129,6 +133,7 @@ class ApiService {
 
   static Future<void> logout() async {
     _token = null;
+    _tenantName = null;
     _currentUser = null;
   }
 
@@ -2009,7 +2014,7 @@ class ApiService {
     }
   }
 
-    static Future<bool> checkSubscription() async {
+  static Future<bool> checkSubscription() async {
     try {
       // We can use the dashboard endpoint as a ping.
       // If it returns 200, they are active. If 402, they are inactive.
@@ -2786,14 +2791,17 @@ class ApiService {
 
   // ==================== BILLING ====================
 
-  static Future<String?> initializeBilling({String? planCode, int? amount}) async {
+  static Future<String?> initializeBilling({
+    String? planCode,
+    int? amount,
+  }) async {
     try {
       final response = await http.post(
         Uri.parse('$baseUrl/billing/initialize'),
         headers: _headers,
         body: jsonEncode({
           if (planCode != null) 'planCode': planCode,
-          if (amount != null) 'amount': amount
+          if (amount != null) 'amount': amount,
         }),
       );
 
